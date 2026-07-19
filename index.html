@@ -1,0 +1,2647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Co-op Team Tracker</title>
+<style>
+  /* ---------- STC brand palette (#4f008c deep purple · #a54ee1 violet ·
+     #ff375e rose · #ffffff white) applied as: deep purple = primary action
+     (buttons — kept off the categorical scale since it's too dark to pass
+     as a light-mode chart mark), violet = brand accent used everywhere a
+     mark/series/active-state needs one (chart marks, active tab, fills),
+     rose = reserved for the critical/overdue status only (never doubled as
+     a series color, so an "overdue" cue never gets confused with a
+     student's identity color). Every value below is validated with the
+     dataviz skill's palette checker — see the design note at the end of
+     this file for the full report. */
+  :root{
+    --surface-1:#fdfcff; --page:#f7f4fc; --text-primary:#1a0e2e; --text-secondary:#5b4f70;
+    --text-muted:#948aa8; --gridline:#e6e0ef; --baseline:#cfc3de; --border:rgba(79,0,140,0.14);
+    --brand-deep:#4f008c;
+    --series-1:#a54ee1; --series-2:#1baf7a; --series-3:#eda100; --series-4:#eb6834;
+    --series-5:#008300; --series-6:#0f9aa8; --series-7:#0e6ba8; --series-8:#99315e;
+    --seq-150:#c9a0ec; --seq-450:#a54ee1; --seq-600:#4f008c;
+    --heat-1:#c9a0ec; --heat-2:#a54ee1; --heat-3:#7d2fb0; --heat-4:#4f008c;
+    /* Status ramp — official STC channel colors, reserved for state (never
+       doubled as a student/series identity color, same discipline already
+       applied to critical/rose): good=green, info=blue, warning=yellow,
+       serious=orange, critical=rose. Mode-invariant on purpose (a status
+       shouldn't repaint between light/dark) — these are marks (dots, bars,
+       chips), always paired with a text label, never used as small standalone
+       text on a light surface (that pairing is the accessibility mitigation;
+       see the design note at the end of this file). */
+    --status-good:#00c48c; --status-info:#1bced8; --status-warning:#ffdd40; --status-serious:#ff6a39; --status-critical:#ff375e;
+    --radius:10px; --radius-sm:6px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --surface-1:#241a38; --page:#150c24; --text-primary:#ffffff; --text-secondary:#cabede;
+      --text-muted:#9585ac; --gridline:#382a52; --baseline:#4a3966; --border:rgba(165,78,225,0.24);
+      --brand-deep:#4f008c;
+      --series-1:#a54ee1; --series-2:#16a06c; --series-3:#c98500; --series-4:#d95926;
+      --series-5:#2fa85a; --series-6:#1f9aa8; --series-7:#2f86c9; --series-8:#b84c79;
+      --seq-150:#6b2fae; --seq-450:#a54ee1; --seq-600:#d9c2f5;
+      --heat-1:#6b2fae; --heat-2:#a54ee1; --heat-3:#c084ea; --heat-4:#d9c2f5;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--page);color:var(--text-primary);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;}
+  /* Brand ribbon — the three STC accent hues in one place, top of every page. */
+  .brand-bar{height:4px;background:linear-gradient(90deg,var(--brand-deep),var(--series-1) 55%,var(--status-critical));}
+  .wrap{max-width:1180px;margin:0 auto;padding:20px 20px 80px;}
+  header.top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap;}
+  header.top h1{font-size:22px;margin:0 0 2px;}
+  header.top p{margin:0;color:var(--text-secondary);font-size:13.5px;}
+  .top-actions{display:flex;gap:8px;flex-wrap:wrap;}
+  button{font-family:inherit;cursor:pointer;}
+  .btn{border:1px solid var(--border);background:var(--surface-1);color:var(--text-primary);
+    padding:9px 14px;border-radius:var(--radius-sm);font-size:13.5px;font-weight:500;display:inline-flex;align-items:center;gap:6px;}
+  .btn:hover{border-color:var(--text-muted);}
+  .btn-primary{background:var(--brand-deep);border-color:var(--brand-deep);color:#fff;}
+  .btn-primary:hover{opacity:.9;}
+  .btn-ghost{background:transparent;border-color:transparent;color:var(--text-secondary);}
+  .btn-danger{color:var(--status-critical);}
+  .icon{width:15px;height:15px;display:inline-block;}
+
+  /* Uses --status-serious (orange), not --status-warning (yellow) — pale yellow reads at
+     ~1.3:1 on this light surface and would nearly vanish as a hairline border. */
+  .banner{background:var(--surface-1);border:1px solid var(--status-serious);border-left:4px solid var(--status-serious);
+    border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px;font-size:13.5px;color:var(--text-secondary);display:none;}
+  .banner.show{display:block;}
+  .banner b{color:var(--text-primary);}
+  .banner code{background:var(--page);padding:1px 5px;border-radius:4px;}
+
+  .stat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px;}
+  .stat-tile{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);padding:13px 14px;}
+  .stat-tile .num{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1;}
+  .stat-tile .lbl{font-size:11.5px;color:var(--text-secondary);margin-top:3px;}
+  .stat-tile-top{display:flex;align-items:baseline;gap:5px;}
+  .stat-tile-sub{font-size:11px;color:var(--text-muted);font-variant-numeric:tabular-nums;}
+  .stat-tile-meter .track{margin:9px 0 0;}
+  .stat-tile-clickable{cursor:pointer;text-align:left;width:100%;font-family:inherit;}
+  .stat-tile-clickable:hover{border-color:var(--text-muted);}
+  .stat-tile-clickable:focus-visible{outline:2px solid var(--series-1);outline-offset:1px;}
+  .stat-tile.good .num{color:var(--status-good);}
+  .stat-tile.critical .num{color:var(--status-critical);}
+
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--gridline);margin-bottom:18px;}
+  .tab{padding:9px 14px;font-size:13.5px;font-weight:500;color:var(--text-secondary);
+    border:none;background:transparent;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .tab.active{color:var(--text-primary);border-bottom-color:var(--series-1);}
+  .tab:hover{color:var(--text-primary);}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .section-head{display:flex;align-items:center;justify-content:space-between;margin:4px 0 12px;flex-wrap:wrap;gap:10px;}
+  .section-head h2{font-size:15px;margin:0;}
+  /* Week/month nav — grouped into one pill so prev/current/next reads as a
+     single control, with the label bold enough to anchor "where am I". */
+  .nav-week{display:flex;align-items:center;gap:2px;font-size:13.5px;background:var(--surface-1);
+    border:1px solid var(--border);border-radius:10px;padding:4px;}
+  .nav-week button.nav-arrow{border:none;background:transparent;border-radius:7px;width:30px;height:30px;
+    color:var(--text-primary);font-size:16px;display:inline-flex;align-items:center;justify-content:center;}
+  .nav-week button.nav-arrow:hover{background:var(--page);}
+  .nav-week .lbl{min-width:190px;text-align:center;color:var(--text-primary);font-weight:600;font-variant-numeric:tabular-nums;}
+  .nav-week .lbl.is-current{color:var(--brand-deep);}
+  @media (prefers-color-scheme: dark){ .nav-week .lbl.is-current{color:var(--series-1);} }
+  .nav-week #wk-today, .nav-week #mo-today{margin-left:4px;border:none;}
+  .nav-week #wk-today[hidden], .nav-week #mo-today[hidden]{display:none;}
+
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:26px;}
+  .student-card{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer;transition:border-color .15s;}
+  .student-card:hover{border-color:var(--text-muted);}
+  .sc-top{display:flex;align-items:center;gap:9px;margin-bottom:10px;}
+  .avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:12px;font-weight:600;flex-shrink:0;}
+  .sc-name{font-size:14px;font-weight:600;}
+  .sc-badge{font-size:11.5px;color:var(--text-secondary);display:flex;align-items:center;gap:5px;margin-top:1px;}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0;}
+  .track{height:7px;border-radius:4px;background:var(--gridline);overflow:hidden;margin:9px 0 8px;}
+  .fill{height:100%;border-radius:4px;background:var(--series-1);}
+  .sc-meta{display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-muted);font-variant-numeric:tabular-nums;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--text-muted);
+    font-weight:600;padding:0 10px 8px;border-bottom:1px solid var(--gridline);}
+  tbody td{padding:10px;border-bottom:1px solid var(--gridline);vertical-align:middle;}
+  tbody tr{cursor:pointer;}
+  tbody tr:hover td{background:var(--page);}
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-secondary);white-space:nowrap;}
+  .name-cell{display:flex;align-items:center;gap:8px;}
+  .avatar-sm{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:9.5px;font-weight:700;flex-shrink:0;}
+  .muted{color:var(--text-muted);}
+  .empty-row td{text-align:center;color:var(--text-muted);padding:30px;}
+
+  .filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+  select, input[type=text], input[type=search]{
+    background:var(--surface-1);border:1px solid var(--border);color:var(--text-primary);
+    padding:7px 10px;border-radius:6px;font-size:13px;font-family:inherit;}
+  .filters input[type=search]{flex:1;min-width:160px;}
+
+  .card-panel{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:20px;}
+
+  /* weekly rows */
+  .wk-row{display:grid;grid-template-columns:150px 1fr 90px;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--gridline);}
+  .wk-row:last-child{border-bottom:none;}
+  .wk-name{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;}
+  .wk-count{font-size:12px;color:var(--text-muted);text-align:right;font-variant-numeric:tabular-nums;}
+
+  /* monthly chart */
+  .chart{display:flex;align-items:flex-end;gap:18px;height:150px;padding:6px 6px 0;position:relative;}
+  .bar-group{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;height:100%;justify-content:flex-end;}
+  .bar-stack{position:relative;width:26px;height:120px;display:flex;align-items:flex-end;}
+  .bar-track,.bar-fill{position:absolute;bottom:0;left:0;width:100%;border-radius:4px 4px 2px 2px;}
+  .bar-track{background:var(--seq-150);}
+  .bar-fill{background:var(--seq-450);}
+  .bar-wk-lbl{font-size:11px;color:var(--text-muted);}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--text-secondary);margin-top:10px;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .legend i{width:10px;height:10px;border-radius:2px;display:inline-block;}
+  .tooltip{position:fixed;background:var(--text-primary);color:var(--page);font-size:12px;padding:6px 9px;
+    border-radius:6px;pointer-events:none;z-index:60;display:none;white-space:nowrap;}
+
+  /* donut */
+  .donut-row{display:flex;align-items:center;gap:26px;flex-wrap:wrap;}
+  .donut-wrap{position:relative;width:132px;height:132px;flex-shrink:0;}
+  .donut-svg{width:100%;height:100%;transform:rotate(-90deg);}
+  .donut-seg{transition:opacity .12s;}
+  .donut-seg:hover{opacity:.82;}
+  .donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;}
+  .donut-num{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1;}
+  .donut-lbl{font-size:10.5px;color:var(--text-muted);margin-top:3px;}
+  .donut-legend{display:grid;grid-template-columns:repeat(2,auto);gap:8px 22px;flex:1;min-width:220px;}
+  .donut-legend-item{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-secondary);}
+  .donut-legend-item .dot{width:9px;height:9px;}
+  .donut-legend-item b{color:var(--text-primary);font-variant-numeric:tabular-nums;margin-left:auto;padding-left:10px;}
+
+  /* Overview status summary — a single-number progress ring (the one thing worth reading in
+     half a second) paired with a 100%-stacked bar for the 5-way status mix. Replaces the old
+     multi-arc donut on the Progress tab: bar length reads far more accurately than pie-slice
+     angle, and every category gets a guaranteed-visible minimum width instead of vanishing
+     into an unreadable sliver when its count is small. (The Student Detail page keeps the
+     original donut above, via renderDonut — unaffected by this.) */
+  .section-head .sub{font-size:11.5px;color:var(--text-muted);}
+  .status-row{display:flex;align-items:center;gap:28px;flex-wrap:wrap;}
+  .ring-wrap{position:relative;width:104px;height:104px;flex-shrink:0;}
+  .ring-svg{width:100%;height:100%;transform:rotate(-90deg);}
+  .ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;}
+  .ring-num{font-size:25px;font-weight:600;line-height:1;}
+  .ring-lbl{font-size:10.5px;color:var(--text-muted);margin-top:3px;text-align:center;}
+  .status-col{flex:1;min-width:260px;}
+  .status-bar{display:flex;height:22px;border-radius:8px;overflow:hidden;background:var(--gridline);}
+  .status-seg{height:100%;min-width:6px;}
+  .status-legend{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:12px;}
+  .status-legend .item{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-secondary);white-space:nowrap;}
+  .status-legend .item .dot{width:9px;height:9px;}
+  .status-legend .item b{color:var(--text-primary);font-variant-numeric:tabular-nums;}
+  .status-legend .item .pct{color:var(--text-muted);font-size:11px;font-variant-numeric:tabular-nums;}
+
+  /* Completion trend — 10-week completion-rate line, the bigger sibling of the compact
+     per-student spark-* sparkline already used on student cards. */
+  .trend-plot{position:relative;width:100%;height:90px;margin-top:6px;}
+  .trend-svg{position:absolute;inset:0;width:100%;height:100%;}
+  .trend-area{fill:var(--series-1);opacity:.12;}
+  .trend-line{fill:none;stroke:var(--series-1);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+  .trend-dot{position:absolute;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;
+    background:var(--surface-1);border:2px solid var(--series-1);}
+  .trend-lbls{display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:var(--text-muted);}
+  .trend-summary{font-size:12.5px;color:var(--text-secondary);margin-top:2px;}
+
+  /* On-time delivery — a plain two-segment bar, more legible than a bare percentage tile. */
+  .ontime-bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--gridline);margin:10px 0 8px;}
+  .ontime-seg{height:100%;}
+  .ontime-legend{display:flex;gap:22px;flex-wrap:wrap;font-size:12.5px;color:var(--text-secondary);}
+  .ontime-legend .dot{width:9px;height:9px;}
+  .ontime-legend b{color:var(--text-primary);font-variant-numeric:tabular-nums;}
+
+  /* Workload by student (admin only) — bar length = task volume, segment colors = status mix,
+     using the exact same DONUT_SEGMENTS palette as everything else on this tab. */
+  .wl-row{display:grid;grid-template-columns:110px 1fr 34px;align-items:center;gap:10px;margin-bottom:12px;cursor:pointer;}
+  .wl-row:last-child{margin-bottom:0;}
+  .wl-row:hover .wl-name{color:var(--series-1);}
+  .wl-name{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .wl-track{height:16px;border-radius:8px;background:var(--gridline);overflow:hidden;display:flex;}
+  .wl-seg{height:100%;}
+  .wl-total{font-size:11.5px;color:var(--text-muted);text-align:right;font-variant-numeric:tabular-nums;}
+  .wl-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--text-secondary);margin-top:14px;
+    border-top:1px solid var(--gridline);padding-top:12px;}
+  .wl-legend span{display:flex;align-items:center;gap:6px;}
+  .wl-legend .dot{width:9px;height:9px;}
+
+  /* sparkline */
+  .spark-wrap{margin:8px 0 2px;}
+  .spark-plot{position:relative;width:100%;height:26px;}
+  .spark-svg{position:absolute;inset:0;display:block;width:100%;height:100%;}
+  .spark-line{fill:none;stroke:var(--series-1);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  .spark-area{fill:var(--series-1);opacity:.10;}
+  /* Plain HTML dots (not SVG) so they stay circular even though the line
+     above is stretched non-uniformly to fill the box. */
+  .spark-dot{position:absolute;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;
+    background:var(--surface-1);border:1.4px solid var(--series-1);}
+  .spark-dot-empty{border-color:var(--text-muted);opacity:.55;}
+  .spark-lbl{font-size:10px;color:var(--text-muted);display:flex;justify-content:space-between;margin-top:1px;}
+
+  /* heatmap */
+  .heatmap{overflow-x:auto;}
+  .heat-grid{display:grid;gap:3px;min-width:340px;}
+  .heat-header-row, .heat-row{display:grid;grid-template-columns:120px repeat(var(--heat-cols,5), 1fr);gap:3px;align-items:center;}
+  .heat-header-row .heat-col-lbl{font-size:10.5px;color:var(--text-muted);text-align:center;padding-bottom:2px;}
+  .heat-row-lbl{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:500;padding-right:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .heat-cell{height:26px;border-radius:5px;background:var(--gridline);cursor:default;}
+  .heat-1{background:var(--heat-1);} .heat-2{background:var(--heat-2);}
+  .heat-3{background:var(--heat-3);} .heat-4{background:var(--heat-4);}
+  .heat-legend{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-secondary);margin-top:12px;}
+  .heat-legend .swatches{display:flex;gap:3px;}
+  .heat-legend .swatch{width:14px;height:10px;border-radius:2px;}
+
+  /* task families / steps */
+  [data-student-link]{cursor:pointer;}
+  [data-student-link]:hover{text-decoration:underline;}
+  .fam-child-row td{background:var(--page);}
+  .fam-step{display:inline-flex;align-items:center;gap:6px;color:var(--text-secondary);}
+  .fam-connector{color:var(--text-muted);}
+  /* Collapsed by default — a family's steps only take table space once someone
+     asks for them, so a screen full of multi-step tasks doesn't turn into a
+     wall of rows. */
+  .fam-toggle{display:inline-flex;align-items:center;gap:5px;border:none;background:var(--page);
+    border-radius:20px;padding:2px 9px 2px 3px;cursor:pointer;font-family:inherit;vertical-align:middle;margin-left:2px;}
+  .fam-toggle:hover{background:var(--gridline);}
+  .fam-count{font-size:11px;color:var(--text-secondary);font-weight:600;font-variant-numeric:tabular-nums;}
+  .fam-chevron{font-size:9px;color:var(--text-muted);transition:transform .12s;display:inline-block;}
+  .steps-list{display:flex;flex-direction:column;gap:2px;margin-top:4px;}
+  .step-row{display:grid;grid-template-columns:20px 1fr auto auto;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;cursor:pointer;}
+  .step-row:hover{background:var(--page);}
+  .step-row-current{background:var(--page);border:1px solid var(--border);}
+  .step-check{width:16px;height:16px;border-radius:5px;border:2px solid var(--text-muted);cursor:pointer;flex-shrink:0;}
+  .step-label{font-size:13px;}
+  .step-deadline{font-size:11.5px;}
+
+  /* student detail view */
+  .back-link{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--text-secondary);
+    background:none;border:none;cursor:pointer;padding:4px 0;margin-bottom:10px;}
+  .back-link:hover{color:var(--text-primary);}
+  .sd-head{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
+  .sd-head .avatar{width:44px;height:44px;font-size:16px;}
+  .sd-head h1{font-size:20px;margin:0 0 2px;}
+
+  /* weekly day-load strip — a per-day stacked bar (done / pending / overdue)
+     instead of a bare count, so the number has a story instead of just a size. */
+  .load-strip{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;}
+  .load-cell{border-radius:8px;padding:9px 6px;text-align:center;background:var(--surface-1);border:1px solid var(--border);
+    cursor:pointer;transition:border-color .12s,transform .12s;}
+  .load-cell:hover{border-color:var(--series-1);transform:translateY(-1px);}
+  .load-cell.load-today{border-color:var(--series-1);border-width:1.5px;}
+  .load-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--gridline);margin:7px 0 6px;}
+  .load-seg{display:block;height:100%;}
+  .swatch-empty{background:var(--gridline);}
+  .load-day{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;}
+  .load-num{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;}
+  .load-sub{font-size:9.5px;color:var(--text-muted);margin-top:1px;}
+
+  /* generic week strip (student detail trend) */
+  .strip-row{display:grid;gap:5px;}
+  .strip-item{display:flex;flex-direction:column;align-items:center;gap:5px;}
+  .strip-swatch{width:100%;height:34px;border-radius:6px;}
+  .strip-lbl{font-size:9.5px;color:var(--text-muted);}
+
+  /* monthly calendar grid */
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+  .cal-dow{font-size:10.5px;color:var(--text-muted);text-align:center;padding-bottom:4px;text-transform:uppercase;letter-spacing:.03em;}
+  .cal-day{min-height:62px;border-radius:8px;background:var(--page);border:1px solid var(--border);padding:6px;
+    cursor:pointer;transition:border-color .12s,background .12s,transform .12s;}
+  .cal-day:hover{border-color:var(--series-1);background:var(--surface-1);transform:translateY(-1px);}
+  .cal-day:focus-visible{outline:2px solid var(--series-1);outline-offset:1px;}
+  .cal-day.cal-has-tasks{background:var(--surface-1);}
+  .cal-day.cal-outside{opacity:.35;}
+  .cal-day.cal-today{border-color:var(--series-1);border-width:1.5px;}
+  .cal-daynum{font-size:11.5px;color:var(--text-secondary);font-variant-numeric:tabular-nums;}
+  .cal-dots{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px;align-items:center;}
+  .cal-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+  .cal-more{font-size:9px;color:var(--text-muted);}
+
+  /* day detail modal (click a calendar day or a weekly load cell) */
+  .day-task-row{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--gridline);cursor:pointer;}
+  .day-task-row:last-child{border-bottom:none;}
+  .day-task-row:hover{background:var(--page);}
+  .day-task-main{flex:1;min-width:0;}
+  .day-task-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .day-task-student{font-size:11.5px;color:var(--text-muted);margin-top:2px;}
+
+  /* team / notifications modal */
+  .team-list{display:flex;flex-direction:column;gap:8px;max-height:360px;overflow:auto;margin-bottom:4px;}
+  .team-row{display:flex;align-items:center;gap:10px;padding:9px;border-radius:8px;border:1px solid var(--border);flex-wrap:wrap;}
+  .team-row-main{flex:1;min-width:150px;}
+  .team-row-name{font-size:13px;font-weight:600;margin-bottom:4px;}
+  .team-row input[type=email]{width:100%;padding:6px 8px;font-size:12.5px;}
+  /* A dot carries the warning color, not the text itself — pale yellow text
+     on this light surface would be close to unreadable (see the color note
+     near the top of this stylesheet). */
+  .team-row-hint{font-size:10.5px;color:var(--text-secondary);margin-top:3px;display:flex;align-items:center;gap:5px;}
+  .team-row-hint .dot{width:6px;height:6px;flex-shrink:0;}
+  .team-row-actions{display:flex;gap:6px;flex-shrink:0;}
+  .team-row-actions .btn{padding:6px 10px;font-size:12.5px;}
+  .team-add-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--gridline);}
+  .team-add-row input{flex:1;min-width:140px;}
+  .team-empty{padding:20px 4px;color:var(--text-muted);font-size:13px;}
+
+  /* modal */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-start;justify-content:center;
+    padding:5vh 16px;overflow:auto;z-index:50;}
+  .overlay.show{display:flex;}
+  .modal{background:var(--surface-1);border-radius:var(--radius);width:100%;max-width:520px;padding:22px;
+    border:1px solid var(--border);}
+  .modal h3{margin:0 0 14px;font-size:16px;}
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:12px;color:var(--text-secondary);margin-bottom:4px;font-weight:500;}
+  .field input, .field select, .field textarea{width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);
+    background:var(--page);color:var(--text-primary);font-family:inherit;font-size:13.5px;}
+  .field textarea{resize:vertical;min-height:60px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .modal-actions{display:flex;justify-content:space-between;align-items:center;margin-top:18px;gap:8px;}
+  .modal-actions .right{display:flex;gap:8px;}
+  .close-x{position:absolute;top:14px;right:16px;background:none;border:none;font-size:18px;color:var(--text-muted);}
+  .modal{position:relative;}
+  .meta-line{font-size:11px;color:var(--text-muted);margin-top:12px;}
+
+  /* report modal */
+  .range-row{display:flex;align-items:center;gap:8px;}
+  .range-row input[type=date]{flex:1;min-width:0;}
+  .range-row span{font-size:11.5px;color:var(--text-muted);}
+  .chip-check-row{display:flex;flex-wrap:wrap;gap:6px;}
+  .chip-check{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);border-radius:20px;
+    padding:5px 12px;font-size:12.5px;cursor:pointer;background:var(--page);color:var(--text-secondary);user-select:none;}
+  .chip-check input{margin:0;accent-color:var(--series-1);}
+  .chip-check:hover{border-color:var(--text-muted);}
+  .chip-check.checked{border-color:var(--series-1);color:var(--text-primary);background:var(--surface-1);font-weight:600;}
+  .report-status{min-height:14px;}
+  .report-status.is-busy{color:var(--text-secondary);}
+  .report-status.is-error{color:var(--status-critical);}
+  .report-status.is-ok{color:var(--status-good);}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--text-primary);color:var(--page);
+    padding:10px 18px;border-radius:8px;font-size:13px;z-index:70;display:none;}
+  .toast.show{display:block;}
+
+  /* passphrase gate — fully opaque, sits above every other overlay so
+     nothing behind it (task data, roster) is visible until unlocked. */
+  .gate-overlay{position:fixed;inset:0;background:var(--page);display:none;align-items:center;justify-content:center;
+    padding:16px;z-index:200;}
+  .gate-overlay.show{display:flex;}
+  .gate-card{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);
+    width:100%;max-width:380px;padding:28px 26px;text-align:center;}
+  .gate-card h3{margin:0 0 6px;font-size:17px;}
+  .gate-card p{margin:0 0 18px;font-size:13px;color:var(--text-secondary);}
+  .gate-card input{width:100%;padding:10px 12px;border-radius:6px;border:1px solid var(--border);
+    background:var(--page);color:var(--text-primary);font-family:inherit;font-size:14px;text-align:center;
+    letter-spacing:.5px;margin-bottom:10px;}
+  .gate-error{font-size:12.5px;color:var(--status-critical);min-height:16px;margin-bottom:10px;}
+  .gate-card .btn-primary{width:100%;justify-content:center;padding:10px 14px;}
+
+  .role-pill{border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;
+    display:inline-flex;align-items:center;gap:5px;color:var(--text-secondary);}
+  .role-pill.is-admin{color:var(--brand-deep);border-color:var(--brand-deep);}
+  @media (prefers-color-scheme: dark){ .role-pill.is-admin{color:var(--series-1);border-color:var(--series-1);} }
+  footer.hint{margin-top:30px;font-size:11.5px;color:var(--text-muted);text-align:center;}
+  @media (max-width:760px){
+    .stat-row{grid-template-columns:repeat(2,1fr);}
+    .row2{grid-template-columns:1fr;}
+    .wk-row{grid-template-columns:1fr;text-align:left;}
+    .wk-count{text-align:left;}
+    .load-strip{grid-template-columns:repeat(7,minmax(36px,1fr));gap:4px;overflow-x:auto;}
+    .load-day{font-size:8.5px;} .load-num{font-size:12.5px;}
+    .cal-grid{grid-template-columns:repeat(7,minmax(30px,1fr));gap:2px;}
+    .cal-day{min-height:44px;padding:3px;}
+    .cal-dow{font-size:8.5px;}
+  }
+</style>
+</head>
+<body>
+<div class="brand-bar"></div>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>Co-op Team Tracker</h1>
+      <p>Progress board — sign in with your personal passcode for your own dashboard, or the admin passphrase for the full team view.</p>
+    </div>
+    <div class="top-actions">
+      <span class="role-pill" id="role-pill" style="display:none;"></span>
+      <button class="btn" id="btn-lock" style="display:none;" title="Lock and re-enter passphrase">🔒 Lock</button>
+      <button class="btn" id="btn-settings">⚙ Settings</button>
+      <button class="btn" id="btn-team">👥 Team</button>
+      <button class="btn" id="btn-report">📊 Report</button>
+      <button class="btn" id="btn-weekly-review">📅 Weekly Review</button>
+      <button class="btn btn-primary" id="btn-add-task">+ Add Task</button>
+    </div>
+  </header>
+
+  <div class="banner" id="config-banner">
+    <b>Not connected yet.</b> This dashboard needs the Google Sheet API URL from your Apps Script deployment.
+    Click <b>⚙ Settings</b> above and paste the Web App URL (see <code>SETUP_GUIDE.md</code>). Until then you're looking at sample data.
+  </div>
+
+  <div class="stat-row" id="stat-row"></div>
+
+  <div class="tabs">
+    <button class="tab active" data-view="overview">Overview</button>
+    <button class="tab" data-view="weekly">Weekly</button>
+    <button class="tab" data-view="monthly">Monthly</button>
+    <button class="tab" data-view="all">All Tasks</button>
+  </div>
+
+  <!-- OVERVIEW -->
+  <section class="view active" id="view-overview">
+    <div class="section-head">
+      <h2 id="overview-donut-heading">Team progress</h2>
+      <span class="sub" id="overview-status-sub"></span>
+    </div>
+    <div class="card-panel">
+      <div class="status-row">
+        <div class="ring-wrap" id="overview-ring"></div>
+        <div class="status-col">
+          <div class="status-bar" id="overview-status-bar"></div>
+          <div class="status-legend" id="overview-status-legend"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-head" style="margin-top:22px;">
+      <h2>Completion trend</h2>
+      <span class="sub">last 10 weeks, by deadline</span>
+    </div>
+    <div class="card-panel">
+      <div class="trend-plot">
+        <svg class="trend-svg" id="overview-trend-svg" viewBox="0 0 400 90" preserveAspectRatio="none"></svg>
+        <div id="overview-trend-dots"></div>
+      </div>
+      <div class="trend-lbls" id="overview-trend-lbls"></div>
+      <div class="trend-summary" id="overview-trend-summary"></div>
+    </div>
+
+    <div class="section-head" style="margin-top:22px;">
+      <h2>On-time delivery</h2>
+      <span class="sub">of completed tasks</span>
+    </div>
+    <div class="card-panel">
+      <div class="ontime-bar">
+        <div class="ontime-seg" id="overview-ontime-good" style="background:var(--status-good)"></div>
+        <div class="ontime-seg" id="overview-ontime-late" style="background:var(--status-serious)"></div>
+      </div>
+      <div class="ontime-legend" id="overview-ontime-legend"></div>
+    </div>
+
+    <div id="overview-workload">
+      <div class="section-head" style="margin-top:22px;">
+        <h2>Workload by student</h2>
+        <span class="sub">status mix, bar length = task volume</span>
+      </div>
+      <div class="card-panel" id="overview-workload-panel"></div>
+    </div>
+
+    <div id="overview-bystudent">
+      <div class="section-head" style="margin-top:22px;"><h2>By student</h2></div>
+      <div class="card-grid" id="student-cards"></div>
+    </div>
+  </section>
+
+  <!-- WEEKLY -->
+  <section class="view" id="view-weekly">
+    <div class="section-head">
+      <h2>Weekly progress</h2>
+      <div class="nav-week">
+        <button class="nav-arrow" id="wk-prev">‹</button>
+        <span class="lbl" id="wk-label">Week</span>
+        <button class="nav-arrow" id="wk-next">›</button>
+        <button class="btn btn-ghost" id="wk-today" style="padding:5px 10px;">This week</button>
+      </div>
+    </div>
+    <div class="card-panel" style="margin-bottom:20px;">
+      <div class="load-strip" id="week-load-strip"></div>
+    </div>
+    <div class="card-panel" id="weekly-rows"></div>
+    <div class="section-head" style="margin-top:22px;"><h2>Tasks due this week</h2></div>
+    <div class="filters">
+      <select id="wk-f-student"><option value="">All students</option></select>
+      <select id="wk-f-status">
+        <option value="">All statuses</option>
+        <option>Not Started</option><option>In Progress</option><option>Submitted</option>
+        <option>Approved</option><option>Blocked</option>
+      </select>
+      <select id="wk-f-timeliness">
+        <option value="">All timeliness</option>
+        <option value="On Track">On Track</option><option value="Due Soon">Due Soon</option>
+        <option value="Overdue">Overdue</option><option value="Late">Late</option><option value="On Time">On Time</option>
+      </select>
+      <input type="search" id="wk-f-search" placeholder="Search task name…">
+    </div>
+    <div class="card-panel">
+      <table>
+        <thead><tr><th>Task</th><th>Student</th><th>Deadline</th><th>Status</th></tr></thead>
+        <tbody id="weekly-task-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- MONTHLY -->
+  <section class="view" id="view-monthly">
+    <div class="section-head">
+      <h2>Month-over-month trend</h2>
+      <div class="nav-week">
+        <button class="nav-arrow" id="mo-prev">‹</button>
+        <span class="lbl" id="mo-label">Month</span>
+        <button class="nav-arrow" id="mo-next">›</button>
+        <button class="btn btn-ghost" id="mo-today" style="padding:5px 10px;">This month</button>
+      </div>
+    </div>
+    <div class="card-panel">
+      <div class="chart" id="month-chart"></div>
+      <div class="legend"><span><i style="background:var(--seq-450)"></i>Completed</span><span><i style="background:var(--seq-150)"></i>Planned</span></div>
+    </div>
+
+    <div class="section-head" style="margin-top:22px;"><h2 id="calendar-title">Calendar — this month</h2></div>
+    <div class="card-panel">
+      <div class="cal-grid" id="month-calendar"></div>
+      <div class="heat-legend" style="flex-wrap:wrap;">
+        <span class="swatches" style="gap:14px;">
+          <span><i class="dot" style="background:var(--status-good);width:8px;height:8px;display:inline-block;border-radius:50%;vertical-align:-1px;"></i> Done</span>
+          <span><i class="dot" style="background:var(--status-info);width:8px;height:8px;display:inline-block;border-radius:50%;vertical-align:-1px;"></i> In progress</span>
+          <span><i class="dot" style="background:var(--status-warning);width:8px;height:8px;display:inline-block;border-radius:50%;vertical-align:-1px;"></i> Due soon</span>
+          <span><i class="dot" style="background:var(--status-critical);width:8px;height:8px;display:inline-block;border-radius:50%;vertical-align:-1px;"></i> Overdue</span>
+          <span><i class="dot" style="background:var(--status-serious);width:8px;height:8px;display:inline-block;border-radius:50%;vertical-align:-1px;"></i> Blocked</span>
+        </span>
+        <span>&nbsp;·&nbsp; click or hover a day for details</span>
+      </div>
+    </div>
+
+    <div class="section-head" style="margin-top:22px;"><h2 id="heatmap-title">Weekly breakdown — this month</h2></div>
+    <div class="card-panel heatmap">
+      <div class="heat-grid" id="month-heatmap"></div>
+      <div class="heat-legend">
+        <span>Less</span>
+        <span class="swatches">
+          <i class="swatch" style="background:var(--gridline)"></i>
+          <i class="swatch" style="background:var(--heat-1)"></i>
+          <i class="swatch" style="background:var(--heat-2)"></i>
+          <i class="swatch" style="background:var(--heat-3)"></i>
+          <i class="swatch" style="background:var(--heat-4)"></i>
+        </span>
+        <span>More completed &nbsp;·&nbsp; hover a cell for details</span>
+      </div>
+    </div>
+
+    <div class="section-head" style="margin-top:22px;"><h2>Per-student — this month</h2></div>
+    <div class="filters">
+      <input type="search" id="mo-f-student" placeholder="Filter by student name…">
+    </div>
+    <div class="card-panel">
+      <table>
+        <thead><tr><th>Student</th><th>Completed</th><th>Total</th><th>Completion</th><th>On-time rate</th></tr></thead>
+        <tbody id="monthly-student-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ALL TASKS -->
+  <section class="view" id="view-all">
+    <div class="section-head"><h2>All tasks</h2></div>
+    <div class="filters">
+      <select id="f-student"><option value="">All students</option></select>
+      <select id="f-status">
+        <option value="">All statuses</option>
+        <option value="__completed">Completed</option>
+        <option>Not Started</option><option>In Progress</option><option>Submitted</option>
+        <option>Approved</option><option>Blocked</option>
+      </select>
+      <select id="f-timeliness">
+        <option value="">All timeliness</option>
+        <option value="On Track">On Track</option><option value="Due Soon">Due Soon</option>
+        <option value="Overdue">Overdue</option><option value="Late">Late</option><option value="On Time">On Time</option>
+      </select>
+      <input type="search" id="f-search" placeholder="Search task name…">
+    </div>
+    <div class="card-panel" style="padding:0;overflow:auto;">
+      <table>
+        <thead><tr><th>Task</th><th>Student</th><th>Start</th><th>Deadline</th><th>Submitted</th><th>Status</th><th>Week</th></tr></thead>
+        <tbody id="all-task-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- STUDENT DETAIL (drill-down, not a tab — reached by clicking a student anywhere) -->
+  <section class="view" id="view-student">
+    <button class="back-link" id="btn-student-back">‹ Back to team</button>
+    <div class="sd-head">
+      <div class="avatar" id="sd-avatar"></div>
+      <div>
+        <h1 id="sd-name">Student</h1>
+        <div class="sc-badge"><i class="dot" id="sd-badge-dot"></i><span id="sd-badge-text"></span></div>
+      </div>
+    </div>
+
+    <div class="stat-row" id="sd-stats" style="grid-template-columns:repeat(4,1fr);"></div>
+
+    <div class="section-head" style="margin-top:6px;"><h2>Progress breakdown</h2></div>
+    <div class="card-panel">
+      <div class="donut-row">
+        <div class="donut-wrap" id="sd-donut"></div>
+        <div class="donut-legend" id="sd-donut-legend"></div>
+      </div>
+    </div>
+
+    <div class="section-head" style="margin-top:22px;"><h2>10-week trend</h2></div>
+    <div class="card-panel">
+      <div class="strip-row" id="sd-strip"></div>
+    </div>
+
+    <div class="section-head" style="margin-top:22px;"><h2 id="sd-tasks-title">All tasks</h2></div>
+    <div class="filters" id="sd-filters">
+      <select id="sd-f-status">
+        <option value="">All statuses</option>
+        <option value="__completed">Completed</option>
+        <option>Not Started</option><option>In Progress</option><option>Submitted</option>
+        <option>Approved</option><option>Blocked</option>
+      </select>
+      <select id="sd-f-timeliness">
+        <option value="">All timeliness</option>
+        <option value="On Track">On Track</option><option value="Due Soon">Due Soon</option>
+        <option value="Overdue">Overdue</option><option value="Late">Late</option><option value="On Time">On Time</option>
+      </select>
+      <input type="search" id="sd-f-search" placeholder="Search task name…">
+    </div>
+    <div class="card-panel" style="padding:0;overflow:auto;">
+      <table>
+        <thead><tr><th>Task</th><th>Start</th><th>Deadline</th><th>Submitted</th><th>Status</th><th>Week</th></tr></thead>
+        <tbody id="sd-task-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Day detail (click a calendar day or weekly load cell) -->
+  <div class="overlay" id="day-overlay">
+    <div class="modal" style="max-width:460px;">
+      <button class="close-x" id="day-close">✕</button>
+      <h3 id="day-title">Tasks due</h3>
+      <div id="day-task-list"></div>
+      <div class="modal-actions" style="justify-content:flex-end;">
+        <button class="btn" id="day-done">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="hint">Data lives in your team's Google Sheet — every add/edit here is saved there instantly for everyone.</footer>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+<div class="toast" id="toast"></div>
+
+<!-- Task modal -->
+<div class="overlay" id="task-overlay">
+  <div class="modal">
+    <button class="close-x" id="task-close">✕</button>
+    <h3 id="task-modal-title">Add task</h3>
+    <input type="hidden" id="f-parentId" value="">
+    <div class="row2">
+      <div class="field"><label>Student name *</label><input list="student-list" id="f-studentName" placeholder="e.g. Alex Chen"></div>
+      <div class="field"><label>Priority</label>
+        <select id="f-priority"><option>Medium</option><option>Low</option><option>High</option></select>
+      </div>
+    </div>
+    <datalist id="student-list"></datalist>
+    <div class="field"><label>Task name *</label><input type="text" id="f-taskName" placeholder="e.g. Draft weekly status report"></div>
+    <div class="field"><label>Step label <span class="muted" style="font-weight:400;">(optional — only needed if this task has multiple steps)</span></label>
+      <input type="text" id="f-stepName" placeholder="e.g. Wireframes, Backend API, QA testing"></div>
+    <div class="field"><label>Description / details</label><textarea id="f-description" placeholder="What needs to happen, links, acceptance criteria…"></textarea></div>
+    <div class="row2">
+      <div class="field"><label>Start date</label><input type="date" id="f-startDate"></div>
+      <div class="field"><label>Deadline *</label><input type="date" id="f-deadline"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Status</label>
+        <select id="f-status2">
+          <option>Not Started</option><option>In Progress</option><option>Submitted</option>
+          <option>Approved</option><option>Blocked</option>
+        </select>
+      </div>
+      <div class="field"><label>Submitted at</label><input type="datetime-local" id="f-submitTime"></div>
+    </div>
+    <button class="btn" id="btn-mark-submitted" style="margin-bottom:12px;">Mark submitted now</button>
+    <div class="field"><label>Notes</label><textarea id="f-notes" placeholder="Feedback, blockers, follow-ups…"></textarea></div>
+
+    <div class="field" id="steps-section" style="display:none;">
+      <label>Steps in this task</label>
+      <div class="steps-list" id="steps-list"></div>
+      <button class="btn" type="button" id="btn-add-step" style="margin-top:8px;">+ Add next step</button>
+    </div>
+
+    <div class="meta-line" id="task-meta"></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="btn-delete-task" style="display:none;">Delete task</button>
+      <div class="right">
+        <button class="btn" id="btn-cancel-task">Cancel</button>
+        <button class="btn btn-primary" id="btn-save-task">Save task</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings modal -->
+<div class="overlay" id="settings-overlay">
+  <div class="modal" style="max-width:460px;">
+    <button class="close-x" id="settings-close">✕</button>
+    <h3>Settings</h3>
+    <div class="field">
+      <label>Apps Script Web App URL</label>
+      <input type="text" id="f-apiUrl" placeholder="https://script.google.com/macros/s/.../exec">
+    </div>
+    <div class="meta-line" id="settings-status" style="margin-bottom:14px;"></div>
+    <div class="modal-actions">
+      <button class="btn" id="btn-test-connection">Test connection</button>
+      <div class="right">
+        <button class="btn" id="settings-cancel">Cancel</button>
+        <button class="btn btn-primary" id="btn-save-settings">Save & connect</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Team modal -->
+<div class="overlay" id="team-overlay">
+  <div class="modal" style="max-width:580px;">
+    <button class="close-x" id="team-close">✕</button>
+    <h3>Team & notifications</h3>
+    <p class="meta-line" id="team-intro" style="margin:-6px 0 14px;">Add an email for anyone here and they'll get an automatic email the moment a new task is assigned to them. Names must match what's typed on their tasks (not case-sensitive).</p>
+    <div class="team-list" id="team-list"></div>
+    <div class="team-add-row" id="team-add-row">
+      <input type="text" id="team-new-name" placeholder="Student name" list="student-list">
+      <input type="email" id="team-new-email" placeholder="email@example.com">
+      <input type="text" id="team-new-focus" placeholder="Focus area (optional)">
+      <input type="text" id="team-new-passcode" placeholder="Personal passcode (optional)">
+      <button class="btn btn-primary" id="btn-team-add">+ Add</button>
+    </div>
+    <div class="modal-actions" style="justify-content:flex-end;">
+      <button class="btn" id="team-done">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Report modal -->
+<div class="overlay" id="report-overlay">
+  <div class="modal" style="max-width:660px;">
+    <button class="close-x" id="report-close">✕</button>
+    <h3>Generate report</h3>
+    <p class="meta-line" style="margin:-6px 0 14px;">Builds an on-brand PowerPoint summary from the sheet and downloads it. Leave a filter empty to include everything for that criterion — filters combine (e.g. a date range AND a student).</p>
+
+    <div class="row2">
+      <div class="field">
+        <label>Date created</label>
+        <div class="range-row"><input type="date" id="rf-created-from"><span>–</span><input type="date" id="rf-created-to"></div>
+      </div>
+      <div class="field">
+        <label>Date submitted</label>
+        <div class="range-row"><input type="date" id="rf-submitted-from"><span>–</span><input type="date" id="rf-submitted-to"></div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Deadline range</label>
+      <div class="range-row" style="max-width:calc(50% - 5px);"><input type="date" id="rf-deadline-from"><span>–</span><input type="date" id="rf-deadline-to"></div>
+    </div>
+
+    <div class="field">
+      <label>Students</label>
+      <div class="chip-check-row" id="rf-students"></div>
+    </div>
+    <div class="field">
+      <label>Status</label>
+      <div class="chip-check-row" id="rf-status"></div>
+    </div>
+    <div class="field">
+      <label>Priority</label>
+      <div class="chip-check-row" id="rf-priority"></div>
+    </div>
+
+    <div class="report-status" id="report-status"></div>
+    <div class="modal-actions">
+      <button class="btn" id="report-cancel">Cancel</button>
+      <button class="btn btn-primary" id="btn-generate-report">📊 Generate & download</button>
+    </div>
+  </div>
+</div>
+
+<!-- Weekly Review modal -->
+<div class="overlay" id="wr-overlay">
+  <div class="modal" style="max-width:480px;">
+    <button class="close-x" id="wr-close">✕</button>
+    <h3>Weekly Review</h3>
+    <p class="meta-line" style="margin:-6px 0 14px;">Builds a PowerPoint meeting deck for the Sunday–Thursday work week: a team roster slide, a team-wide recap of last week (completed / on-time / not finished, with a status chart), one slide per team member listing their own last-week tasks, and a whole-team slide of what's due this week.</p>
+    <div class="report-status" id="wr-status"></div>
+    <div class="modal-actions">
+      <button class="btn" id="wr-cancel">Cancel</button>
+      <button class="btn btn-primary" id="btn-generate-wr">📅 Generate & download</button>
+    </div>
+  </div>
+</div>
+
+<!-- Passphrase gate — blocks the dashboard until a valid member/admin passphrase is entered.
+     Enforced again server-side in Code.gs, so this screen alone isn't the real security
+     boundary — it's just the UI half of it. -->
+<div class="gate-overlay" id="gate-overlay">
+  <div class="gate-card">
+    <h3>Team access</h3>
+    <p>Enter your passphrase to open the tracker.</p>
+    <input type="password" id="gate-key" placeholder="Passphrase" autocomplete="off">
+    <div class="gate-error" id="gate-error"></div>
+    <button class="btn btn-primary" id="gate-submit">Unlock</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- config ---------- */
+  // Baked-in default so teammates don't have to configure anything —
+  // a ?api=... URL param (if present) still overrides this, and Settings
+  // can always be used to point at a different Sheet later.
+  var DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbyKDWoKveFZaNcTMk53LpFLQI41GWUNE0ZYkgHp-YMyQA0IE_yZQml5axNRKf-JFCB3/exec';
+  var params = new URLSearchParams(location.search);
+  var CONFIG = { API_URL: params.get('api') || DEFAULT_API_URL, KEY: '' };
+
+  // The passphrase is intentionally kept OUT of the URL (unlike API_URL) —
+  // the whole point of the gate is that a shared/bookmarked link alone
+  // shouldn't grant access. It's remembered per-browser in localStorage
+  // instead, scoped to the connected sheet, so teammates don't retype it
+  // every visit but it never ends up in a copy-pasted URL.
+  function keyStorageName(){ return 'coopTrackerKey::' + (CONFIG.API_URL || ''); }
+
+  var SAMPLE = !CONFIG.API_URL;
+  var state = { tasks: [], students: [], role: '', myName: '', selectedWeek: weekKey(new Date()), selectedMonth: todayMonth(), editingId: null, view: 'overview',
+    detailStudent: null, studentDetailFrom: 'overview' };
+  /** True when signed in with a personal (student) passcode rather than the admin passphrase
+   *  or sample/demo mode — the dashboard is scoped to just this one person's data. */
+  function isPersonal(){ return !SAMPLE && state.role === 'member'; }
+
+  /* ---------- date / week / month helpers ---------- */
+  // Weeks run Sunday → Saturday throughout. Rather than force Sunday-start
+  // weeks into ISO 8601 week numbering (which is inherently Monday/Thursday
+  // based and doesn't translate cleanly), each week is identified by the
+  // ISO date of its Sunday — e.g. "2026-07-05" — and always *displayed* as
+  // a friendly date range, never a bare week number.
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function toISODate(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+  function todayISO(){ return toISODate(new Date()); }
+  function todayMonth(){ return todayISO().slice(0,7); }
+  function parseDate(s){
+    if(!s) return null;
+    // Accepts plain "yyyy-mm-dd" (the normal case) as well as a full
+    // ISO datetime string (defensive: covers rows where a date got stored
+    // as a real Date cell upstream and comes back with a time/zone already attached).
+    var str = /T/.test(String(s)) ? String(s) : (s + 'T00:00:00');
+    var d = new Date(str);
+    return isNaN(d) ? null : d;
+  }
+
+  function sundayOfWeek(d){
+    if(!d || isNaN(d)) return null;
+    var s = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    s.setDate(s.getDate() - s.getDay()); // getDay(): 0 = Sunday
+    return s;
+  }
+  function weekKey(d){
+    var s = sundayOfWeek(d);
+    return s ? toISODate(s) : '';
+  }
+  function weekRangeLabel(key){
+    var sun = parseDate(key); if(!sun) return '';
+    var sat = new Date(sun); sat.setDate(sun.getDate()+6);
+    var opts = {month:'short', day:'numeric'};
+    return 'Week of ' + sun.toLocaleDateString(undefined,opts) + ' – ' + sat.toLocaleDateString(undefined,opts);
+  }
+  function weekShortLabel(key){
+    var sun = parseDate(key); if(!sun) return '—';
+    return sun.toLocaleDateString(undefined,{month:'short', day:'numeric'});
+  }
+  function shiftWeek(key, delta){
+    var sun = parseDate(key); sun.setDate(sun.getDate() + delta*7); return toISODate(sun);
+  }
+  function monthLabelText(m){
+    var d = new Date(m+'-01T00:00:00');
+    return d.toLocaleDateString(undefined,{month:'long', year:'numeric'});
+  }
+  function monthShortLabel(m){
+    var d = new Date(m+'-01T00:00:00');
+    return d.toLocaleDateString(undefined,{month:'short'});
+  }
+  function shiftMonth(m, delta){
+    var d = new Date(m+'-01T00:00:00'); d.setMonth(d.getMonth()+delta);
+    return d.getFullYear()+'-'+pad(d.getMonth()+1);
+  }
+  /** Sunday-start week keys whose week overlaps at least one day of month m (yyyy-mm). */
+  function weeksInMonth(m){
+    var d = new Date(m+'-01T00:00:00'); var month = d.getMonth();
+    var weeks = [];
+    while(d.getMonth() === month){
+      var key = weekKey(d);
+      if(weeks.indexOf(key) === -1) weeks.push(key);
+      d.setDate(d.getDate()+1);
+    }
+    return weeks;
+  }
+  /** `count` consecutive months (yyyy-mm) ending at and including centerMonth, oldest first. */
+  function monthsWindow(centerMonth, count){
+    var out = [];
+    for(var i=count-1;i>=0;i--) out.push(shiftMonth(centerMonth, -i));
+    return out;
+  }
+
+  /* ---------- status / timeliness ---------- */
+  function computeBadge(t){
+    var status = t.status || 'Not Started';
+    var deadline = parseDate(t.deadline);
+    var now = new Date();
+    if(status === 'Blocked') return {text:'Blocked', role:'serious'};
+    if(status === 'Submitted' || status === 'Approved'){
+      if(t.submitTime && deadline){
+        var submitted = new Date(t.submitTime);
+        var deadlineEnd = new Date(deadline); deadlineEnd.setHours(23,59,59,999);
+        return submitted <= deadlineEnd ? {text: status==='Approved'?'Approved':'On Time', role:'good'}
+                                         : {text:'Late', role:'warning'};
+      }
+      return {text: status, role:'good'};
+    }
+    if(!deadline) return {text: status, role:'neutral'};
+    var daysLeft = Math.ceil((deadline - stripTime(now)) / 86400000);
+    if(daysLeft < 0) return {text:'Overdue', role:'critical'};
+    if(daysLeft <= 2) return {text:'Due Soon', role:'warning'};
+    return {text: status === 'In Progress' ? 'In Progress' : 'On Track', role: status==='In Progress' ? 'info' : 'neutral'};
+  }
+  function stripTime(d){ return new Date(d.getFullYear(),d.getMonth(),d.getDate()); }
+  function roleColor(role){
+    return {good:'var(--status-good)', warning:'var(--status-warning)', serious:'var(--status-serious)',
+            critical:'var(--status-critical)', info:'var(--status-info)', neutral:'var(--text-muted)'}[role] || 'var(--text-muted)';
+  }
+  /** Shared filter predicate — task name/description search, status (with a
+   * "__completed" meta-value meaning Submitted-or-Approved), and computed
+   * timeliness text. Reused by every filterable task table in the app so
+   * "Completed" and the timeliness labels mean the same thing everywhere. */
+  function filterTasks(tasks, statusSel, timeSel, q){
+    q = (q||'').trim().toLowerCase();
+    return tasks.filter(function(t){
+      if(statusSel === '__completed'){ if(!(t.status==='Submitted'||t.status==='Approved')) return false; }
+      else if(statusSel && t.status !== statusSel) return false;
+      if(timeSel && computeBadge(t).text !== timeSel) return false;
+      if(q && !((t.taskName||'').toLowerCase().indexOf(q)>-1 || (t.description||'').toLowerCase().indexOf(q)>-1)) return false;
+      return true;
+    });
+  }
+
+  /* ---------- student color assignment (fixed categorical order) ---------- */
+  var SERIES = ['--series-1','--series-2','--series-3','--series-4','--series-5','--series-6','--series-7','--series-8'];
+  function studentNames(){
+    var set = {}; state.tasks.forEach(function(t){ if(t.studentName) set[t.studentName]=1; });
+    return Object.keys(set).sort();
+  }
+  function studentColor(name){
+    var names = studentNames(); var idx = names.indexOf(name);
+    if(idx === -1 || idx >= SERIES.length) return 'var(--text-muted)';
+    return 'var('+SERIES[idx]+')';
+  }
+  function initials(name){
+    if(!name) return '?';
+    var parts = name.trim().split(/\s+/);
+    return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
+  }
+
+  /* ---------- sample data (shown until API URL is configured) ---------- */
+  function buildSample(){
+    var names = ['Alex Chen','Priya Nair','Sam Okafor'];
+    var out = []; var today = new Date();
+    names.forEach(function(name, ni){
+      for(var i=0;i<5;i++){
+        var dl = new Date(today); dl.setDate(dl.getDate() + (i-2)*3 + ni);
+        var submitted = i < 2;
+        out.push({
+          id: name+'-'+i, studentName:name, taskName: ['Kickoff notes','Design draft v1','API integration','Weekly report','Peer review'][i],
+          description:'Sample task for design preview — connect your Sheet to replace this with real data.',
+          priority:['Low','Medium','High'][i%3], startDate: toISODate(new Date(dl.getFullYear(),dl.getMonth(),dl.getDate()-3)),
+          deadline: toISODate(dl), submitTime: submitted ? new Date(dl.getFullYear(),dl.getMonth(),dl.getDate()-1).toISOString() : '',
+          status: submitted ? 'Submitted' : (i===2?'In Progress':'Not Started'), notes:''
+        });
+      }
+    });
+    return out;
+  }
+
+  /* ---------- API ---------- */
+  function apiUrlWithKey(){
+    var sep = CONFIG.API_URL.indexOf('?') > -1 ? '&' : '?';
+    return CONFIG.API_URL + sep + 'key=' + encodeURIComponent(CONFIG.KEY || '');
+  }
+  function isAuthError(json){
+    return !!(json && json.ok === false && /passphrase/i.test(json.error || ''));
+  }
+  function fetchTasks(){
+    if(!CONFIG.API_URL){
+      state.tasks = buildSample();
+      renderAll();
+      return Promise.resolve();
+    }
+    return fetch(apiUrlWithKey()).then(function(r){return r.json();}).then(function(json){
+      if(json.ok){
+        state.role = json.role || state.role;
+        state.myName = json.studentName || '';
+        state.tasks = json.tasks || []; state.students = json.students || [];
+        updateRoleUI();
+      } else if(isAuthError(json)){
+        // The stored passphrase no longer works (e.g. it was changed
+        // server-side) — drop it and send the person back to the gate
+        // rather than showing a confusing empty dashboard.
+        lockOut(json.error);
+        return;
+      } else {
+        showToast('Load failed: ' + (json.error||'unknown error'));
+      }
+      renderAll();
+    }).catch(function(err){
+      showToast('Could not reach the sheet — check Settings.');
+      renderAll();
+    });
+  }
+  function apiCall(action, payload){
+    if(!CONFIG.API_URL){
+      showToast('Connect your Google Sheet first (⚙ Settings) to save changes.');
+      return Promise.reject('not configured');
+    }
+    var body = Object.assign({action:action, key: CONFIG.KEY}, payload);
+    return fetch(CONFIG.API_URL, {method:'POST', body: JSON.stringify(body)}).then(function(r){return r.json();});
+  }
+
+  /* ---------- passphrase gate ---------- */
+  // The gate is a UI convenience only — Code.gs checks the passphrase on
+  // every request regardless, so even someone who skips this screen (e.g.
+  // by calling the raw Apps Script URL directly) gets nothing back without it.
+  function showGateError(msg){
+    document.getElementById('gate-error').textContent = msg || '';
+  }
+  function showGate(){
+    document.getElementById('gate-overlay').classList.add('show');
+    setTimeout(function(){ document.getElementById('gate-key').focus(); }, 50);
+  }
+  function hideGate(){
+    document.getElementById('gate-overlay').classList.remove('show');
+  }
+  function updateRoleUI(){
+    var pill = document.getElementById('role-pill');
+    var lockBtn = document.getElementById('btn-lock');
+    if(!CONFIG.API_URL || !state.role){
+      pill.style.display = 'none';
+      lockBtn.style.display = 'none';
+      return;
+    }
+    pill.style.display = 'inline-flex';
+    lockBtn.style.display = 'inline-flex';
+    pill.textContent = state.role === 'admin' ? '🔑 Admin' : ('👤 ' + (state.myName || 'Member'));
+    pill.classList.toggle('is-admin', state.role === 'admin');
+    // A personal passcode has no roster to view (the server never sends one — see doGet in
+    // Code.gs) and no Team panel actions available, so the button itself is hidden rather
+    // than shown in a confusing empty/read-only state.
+    document.getElementById('btn-team').style.display = isPersonal() ? 'none' : '';
+    var donutHeading = document.getElementById('overview-donut-heading');
+    if(donutHeading) donutHeading.textContent = isPersonal() ? 'Your progress' : 'Team progress';
+    var byStudent = document.getElementById('overview-bystudent');
+    if(byStudent) byStudent.style.display = isPersonal() ? 'none' : '';
+    var workload = document.getElementById('overview-workload');
+    if(workload) workload.style.display = isPersonal() ? 'none' : '';
+  }
+  function lockOut(errorMsg){
+    CONFIG.KEY = '';
+    state.role = '';
+    state.myName = '';
+    try{ localStorage.removeItem(keyStorageName()); }catch(e){}
+    state.tasks = []; state.students = [];
+    updateRoleUI();
+    renderAll();
+    showGate();
+    document.getElementById('gate-key').value = '';
+    showGateError(errorMsg && isAuthError({ok:false, error:errorMsg}) ? 'That passphrase no longer works — enter the current one.' : (errorMsg||''));
+  }
+  function attemptUnlock(key){
+    if(!key){ showGateError('Enter a passphrase.'); return; }
+    var submitBtn = document.getElementById('gate-submit');
+    submitBtn.disabled = true;
+    CONFIG.KEY = key;
+    fetch(apiUrlWithKey()).then(function(r){return r.json();}).then(function(json){
+      submitBtn.disabled = false;
+      if(json && json.ok){
+        state.role = json.role;
+        state.myName = json.studentName || '';
+        state.tasks = json.tasks || []; state.students = json.students || [];
+        try{ localStorage.setItem(keyStorageName(), key); }catch(e){}
+        hideGate();
+        updateRoleUI();
+        renderAll();
+      } else {
+        CONFIG.KEY = '';
+        try{ localStorage.removeItem(keyStorageName()); }catch(e){}
+        showGateError((json && json.error) || 'Invalid passphrase.');
+      }
+    }).catch(function(){
+      submitBtn.disabled = false;
+      CONFIG.KEY = '';
+      showGateError('Could not reach the sheet — check your connection and try again.');
+    });
+  }
+  function boot(){
+    if(!CONFIG.API_URL){
+      fetchTasks();
+      return;
+    }
+    showGate();
+    var stored = '';
+    try{ stored = localStorage.getItem(keyStorageName()) || ''; }catch(e){}
+    if(stored){
+      document.getElementById('gate-key').value = stored;
+      showGateError('Checking…');
+      attemptUnlock(stored);
+    }
+  }
+  document.getElementById('gate-submit').addEventListener('click', function(){
+    attemptUnlock(document.getElementById('gate-key').value.trim());
+  });
+  document.getElementById('gate-key').addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ attemptUnlock(document.getElementById('gate-key').value.trim()); }
+  });
+  document.getElementById('btn-lock').addEventListener('click', function(){
+    lockOut('');
+  });
+
+  /* ---------- rendering ---------- */
+  function safeRender(fn){
+    try { fn(); }
+    catch(err){
+      console.error('Render error in ' + (fn.name || 'anonymous') + ':', err);
+      showToast('Something went wrong rendering part of the dashboard — check the browser console.');
+    }
+  }
+  function renderAll(){
+    // Each section renders independently — if one task's bad data trips up
+    // a single tab, the rest of the dashboard still draws instead of going blank.
+    safeRender(renderBanner);
+    safeRender(renderStats);
+    safeRender(renderOverviewStatus);
+    safeRender(renderOverviewTrend);
+    safeRender(renderOverviewOnTime);
+    safeRender(renderWorkloadByStudent);
+    safeRender(renderStudentCards);
+    safeRender(renderWeekly);
+    safeRender(renderMonthly);
+    safeRender(renderAllTasks);
+    safeRender(renderStudentDatalist);
+    if(state.view === 'student') safeRender(renderStudentDetail);
+  }
+
+  function renderBanner(){
+    document.getElementById('config-banner').classList.toggle('show', SAMPLE);
+  }
+
+  /** A stat tile whose body is a meter (current/total bar) instead of a bare
+   * number — "18 of 42" reads as a proportion at a glance instead of asking
+   * the reader to remember the total from a different tile. Completed/Overdue
+   * are also click targets straight into a filtered All Tasks. */
+  function statMeterTile(opts){
+    var clickable = !opts.noClick;
+    var attrs = clickable ? ' id="stat-tile-'+opts.id+'" role="button" tabindex="0"' : '';
+    return '<div class="stat-tile stat-tile-meter'+(clickable?' stat-tile-clickable':'')+'"'+attrs+'>'+
+      '<div class="stat-tile-top"><span class="num">'+opts.num+'</span><span class="stat-tile-sub">'+esc(opts.sub)+'</span></div>'+
+      '<div class="lbl">'+esc(opts.lbl)+'</div>'+
+      '<div class="track"><div class="fill" style="width:'+opts.pct+'%;background:'+opts.color+'"></div></div>'+
+      '</div>';
+  }
+  function renderStats(){
+    var tasks = state.tasks;
+    var total = tasks.length;
+    var completed = tasks.filter(function(t){return t.status==='Submitted'||t.status==='Approved';}).length;
+    var overdue = tasks.filter(function(t){return computeBadge(t).role==='critical';}).length;
+    var students = studentNames().length;
+    var onTimeCount = tasks.filter(function(t){return t.submitTime && (t.status==='Submitted'||t.status==='Approved');});
+    var onTimeRate = onTimeCount.length ? Math.round(100*onTimeCount.filter(function(t){return computeBadge(t).text!=='Late';}).length/onTimeCount.length) : null;
+    var personal = isPersonal();
+
+    // A personal passcode's task list is already just their own — a "Students" count of 1
+    // is noise, and "Team on-time rate" reads oddly once "team" means "me".
+    var html = (personal ? '' : '<div class="stat-tile"><div class="num">'+students+'</div><div class="lbl">Students</div></div>')+
+      '<div class="stat-tile"><div class="num">'+total+'</div><div class="lbl">Total tasks</div></div>'+
+      statMeterTile({id:'completed', num:completed, sub:'of '+total, lbl:'Completed', pct: total?Math.round(100*completed/total):0, color:'var(--status-good)'})+
+      statMeterTile({id:'overdue', num:overdue, sub:'of '+total, lbl:'Overdue', pct: total?Math.round(100*overdue/total):0, color:'var(--status-critical)'})+
+      statMeterTile({id:'ontime', noClick:true, num:onTimeRate===null?'—':onTimeRate+'%', sub:onTimeCount.length+' submitted', lbl:(personal?'Your':'Team')+' on-time rate', pct: onTimeRate||0, color:'var(--status-good)'});
+    document.getElementById('stat-row').innerHTML = html;
+
+    bindStatClick('stat-tile-completed', function(){ goToAllTasksFiltered({status:'__completed'}); });
+    bindStatClick('stat-tile-overdue', function(){ goToAllTasksFiltered({timeliness:'Overdue'}); });
+  }
+  /** Click + Enter/Space, since these tiles are plain divs with role="button". */
+  function bindStatClick(id, fn){
+    var el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener('click', fn);
+    el.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); fn(); } });
+  }
+  /** Jumps to All Tasks pre-filtered — used by the Completed/Overdue stat tiles. */
+  function goToAllTasksFiltered(opts){
+    opts = opts || {};
+    document.getElementById('f-student').value = opts.student || '';
+    document.getElementById('f-status').value = opts.status || '';
+    document.getElementById('f-timeliness').value = opts.timeliness || '';
+    document.getElementById('f-search').value = '';
+    switchView('all');
+    renderAllTasks();
+  }
+
+  /** Buckets every task into exactly one status-mix segment, in a fixed draw order. */
+  function statusBucket(t){
+    if(t.status==='Submitted' || t.status==='Approved') return 'Completed';
+    if(t.status==='Blocked') return 'Blocked';
+    if(computeBadge(t).role==='critical') return 'Overdue';
+    if(t.status==='In Progress') return 'In Progress';
+    return 'Upcoming';
+  }
+  var DONUT_SEGMENTS = [
+    {key:'Completed',  color:'var(--status-good)'},
+    {key:'In Progress',color:'var(--status-info)'},
+    {key:'Upcoming',   color:'var(--text-muted)'},
+    {key:'Blocked',    color:'var(--status-serious)'},
+    {key:'Overdue',    color:'var(--status-critical)'}
+  ];
+  /** Generic status-mix donut — used for the team-wide Overview donut and each Student Detail donut. */
+  function renderDonut(tasks, svgElId, legendElId){
+    var total = tasks.length;
+    var counts = {};
+    DONUT_SEGMENTS.forEach(function(s){ counts[s.key] = 0; });
+    tasks.forEach(function(t){ counts[statusBucket(t)]++; });
+
+    var wrap = document.getElementById(svgElId);
+    var r = 40, cx = 50, cy = 50, circumference = 2*Math.PI*r, gap = total ? 3 : 0;
+    var offset = 0;
+    var svgParts = [];
+    if(total === 0){
+      svgParts.push('<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="var(--gridline)" stroke-width="14"/>');
+    } else {
+      DONUT_SEGMENTS.forEach(function(seg){
+        var n = counts[seg.key];
+        if(!n) return;
+        var len = (n/total) * circumference - gap;
+        if(len < 0) len = 0;
+        svgParts.push('<circle class="donut-seg" data-tip="'+seg.key+': '+n+' task'+(n===1?'':'s')+' ('+Math.round(100*n/total)+'%)" '+
+          'cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+seg.color+'" stroke-width="14" '+
+          'stroke-dasharray="'+len+' '+(circumference-len)+'" stroke-dashoffset="'+(-offset)+'" stroke-linecap="round"/>');
+        offset += (n/total) * circumference;
+      });
+    }
+    wrap.innerHTML = '<svg class="donut-svg" viewBox="0 0 100 100">'+svgParts.join('')+'</svg>'+
+      '<div class="donut-center"><div class="donut-num">'+(total? Math.round(100*counts.Completed/total) : 0)+'%</div><div class="donut-lbl">'+(total? 'complete':'no tasks yet')+'</div></div>';
+    bindTooltips(wrap);
+
+    document.getElementById(legendElId).innerHTML = DONUT_SEGMENTS.map(function(seg){
+      return '<span class="donut-legend-item"><i class="dot" style="background:'+seg.color+'"></i>'+seg.key+'<b>'+counts[seg.key]+'</b></span>';
+    }).join('');
+    return counts;
+  }
+  /** Overview tab's status summary — a single-number progress ring + a 100%-stacked status
+   *  bar, replacing the old multi-arc donut. Uses state.tasks directly: for a personal
+   *  passcode the server already scoped that to just their own tasks (see doGet in Code.gs),
+   *  so no extra client-side filtering is needed here. */
+  function renderOverviewStatus(){
+    var tasks = state.tasks;
+    var total = tasks.length, counts = {};
+    DONUT_SEGMENTS.forEach(function(s){ counts[s.key] = 0; });
+    tasks.forEach(function(t){ counts[statusBucket(t)]++; });
+    var pct = total ? Math.round(100*counts.Completed/total) : 0;
+    var r = 42, circ = 2*Math.PI*r;
+    var ringLen = total ? (pct/100)*circ : 0;
+    document.getElementById('overview-ring').innerHTML =
+      '<svg class="ring-svg" viewBox="0 0 100 100">'+
+      '<circle cx="50" cy="50" r="'+r+'" fill="none" stroke="var(--gridline)" stroke-width="11"/>'+
+      (total ? '<circle cx="50" cy="50" r="'+r+'" fill="none" stroke="var(--status-good)" stroke-width="11" stroke-linecap="round" stroke-dasharray="'+ringLen+' '+(circ-ringLen)+'"/>' : '')+
+      '</svg>'+
+      '<div class="ring-center"><div class="ring-num">'+pct+'%</div><div class="ring-lbl">'+(total?'complete':'no tasks yet')+'</div></div>';
+    var subEl = document.getElementById('overview-status-sub');
+    if(subEl) subEl.textContent = total ? (counts.Completed+' of '+total+' tasks done') : '';
+    var barEl = document.getElementById('overview-status-bar');
+    barEl.innerHTML = total ? DONUT_SEGMENTS.map(function(seg){
+      var n = counts[seg.key]; if(!n) return '';
+      return '<div class="status-seg" style="flex:'+n+' 0 0;background:'+seg.color+'" data-tip="'+esc(seg.key+': '+n+' ('+Math.round(100*n/total)+'%)')+'"></div>';
+    }).join('') : '<div class="status-seg" style="flex:1 0 0;background:var(--gridline)"></div>';
+    document.getElementById('overview-status-legend').innerHTML = DONUT_SEGMENTS.map(function(seg){
+      var n = counts[seg.key], p = total ? Math.round(100*n/total) : 0;
+      return '<span class="item"><i class="dot" style="background:'+seg.color+'"></i>'+seg.key+' <b>'+n+'</b><span class="pct">('+p+'%)</span></span>';
+    }).join('');
+    bindTooltips(barEl);
+  }
+
+  /** 10-week team (or personal) completion-rate trend — same math as studentSparkline,
+   *  scaled up, with week labels and a plain-language delta summary underneath. */
+  function renderOverviewTrend(){
+    var tasks = state.tasks;
+    var weeks = lastNWeekKeys(10);
+    var w = 400, h = 90, padY = 10;
+    var pts = weeks.map(function(wk){
+      var wkTasks = tasks.filter(function(t){return t.deadline && weekKey(parseDate(t.deadline))===wk;});
+      var completed = wkTasks.filter(function(t){return t.status==='Submitted'||t.status==='Approved';}).length;
+      var rate = wkTasks.length ? completed/wkTasks.length : null;
+      return {week:wk, rate:rate, total:wkTasks.length, completed:completed};
+    });
+    var xStep = w/(pts.length-1);
+    var coords = pts.map(function(p,i){ return {x:i*xStep, y: p.rate===null ? h/2 : padY+(1-p.rate)*(h-2*padY), p:p}; });
+    var segs = [], cur = [];
+    coords.forEach(function(c){ if(c.p.rate===null){ if(cur.length){segs.push(cur);cur=[];} } else cur.push(c); });
+    if(cur.length) segs.push(cur);
+    var svg = segs.map(function(seg){
+      var d = seg.map(function(c,i){return (i===0?'M':'L')+c.x.toFixed(1)+','+c.y.toFixed(1);}).join(' ');
+      var area = d+' L'+seg[seg.length-1].x.toFixed(1)+','+h+' L'+seg[0].x.toFixed(1)+','+h+' Z';
+      return '<path class="trend-area" d="'+area+'"/><path class="trend-line" d="'+d+'"/>';
+    }).join('');
+    document.getElementById('overview-trend-svg').innerHTML = svg;
+    var dotsEl = document.getElementById('overview-trend-dots');
+    dotsEl.innerHTML = coords.map(function(c){
+      var leftPct = (c.x/w*100).toFixed(2), topPct = (c.y/h*100).toFixed(2);
+      var tip = weekShortLabel(c.p.week) + ': ' + (c.p.total ? (c.p.completed+'/'+c.p.total+' completed ('+Math.round(c.p.rate*100)+'%)') : 'no tasks due');
+      return '<div class="trend-dot" data-tip="'+esc(tip)+'" style="left:'+leftPct+'%;top:'+topPct+'%"></div>';
+    }).join('');
+    bindTooltips(dotsEl);
+    document.getElementById('overview-trend-lbls').innerHTML = '<span>'+weekShortLabel(weeks[0])+'</span><span>'+weekShortLabel(weeks[weeks.length-1])+'</span>';
+    var withRate = pts.filter(function(p){return p.rate!==null;});
+    var summaryEl = document.getElementById('overview-trend-summary');
+    if(withRate.length > 1){
+      var first = withRate[0], last = withRate[withRate.length-1];
+      var delta = Math.round((last.rate-first.rate)*100);
+      summaryEl.innerHTML = 'Completion rate is <b style="color:'+(delta>=0?'var(--status-good)':'var(--status-critical)')+'">'+
+        (delta>=0?'up '+delta:'down '+Math.abs(delta))+' points</b> over this span — '+Math.round(last.rate*100)+'% this week vs '+Math.round(first.rate*100)+'% 9 weeks ago.';
+    } else {
+      summaryEl.textContent = '';
+    }
+  }
+
+  /** On-time vs late among completed tasks — same eligibility/definition already used by the
+   *  "on-time rate" stat tile (submitTime recorded + Submitted/Approved), just drawn as a bar. */
+  function renderOverviewOnTime(){
+    var eligible = state.tasks.filter(function(t){return t.submitTime && (t.status==='Submitted'||t.status==='Approved');});
+    var late = eligible.filter(function(t){return computeBadge(t).text==='Late';}).length;
+    var onTime = eligible.length - late;
+    var total = eligible.length;
+    document.getElementById('overview-ontime-good').style.flex = (total?onTime:0)+' 0 0';
+    document.getElementById('overview-ontime-late').style.flex = (total?late:0)+' 0 0';
+    document.getElementById('overview-ontime-legend').innerHTML = total ?
+      '<span><i class="dot" style="background:var(--status-good)"></i> On time <b>'+onTime+'</b> ('+Math.round(100*onTime/total)+'%)</span>'+
+      '<span><i class="dot" style="background:var(--status-serious)"></i> Late <b>'+late+'</b> ('+Math.round(100*late/total)+'%)</span>'
+      : '<span class="muted">No completed tasks with a recorded submit time yet.</span>';
+  }
+
+  /** Workload by student (admin view only — hidden for a personal passcode via updateRoleUI).
+   *  Bar length = task volume relative to the busiest student, segment colors = status mix,
+   *  using the same DONUT_SEGMENTS palette as the rest of this tab. Click a row to drill in,
+   *  same as clicking a student card. */
+  function renderWorkloadByStudent(){
+    var panel = document.getElementById('overview-workload-panel');
+    if(!panel) return;
+    var names = studentNames();
+    if(!names.length){ panel.innerHTML = '<div class="muted" style="padding:6px 0;">No students yet — add a task to get started.</div>'; return; }
+    var byStudent = {};
+    names.forEach(function(n){ byStudent[n] = {Completed:0,'In Progress':0,Upcoming:0,Blocked:0,Overdue:0,total:0}; });
+    state.tasks.forEach(function(t){
+      if(!byStudent[t.studentName]) return;
+      byStudent[t.studentName][statusBucket(t)]++;
+      byStudent[t.studentName].total++;
+    });
+    var maxTotal = Math.max.apply(null, names.map(function(n){return byStudent[n].total;})) || 1;
+    var sorted = names.slice().sort(function(a,b){return byStudent[b].total-byStudent[a].total;});
+    panel.innerHTML = sorted.map(function(n){
+      var d = byStudent[n];
+      var widthPct = d.total ? Math.max(14, Math.round(100*d.total/maxTotal)) : 6;
+      var segs = DONUT_SEGMENTS.map(function(seg){
+        var v = d[seg.key];
+        return v ? '<span class="wl-seg" style="flex:'+v+' 0 0;background:'+seg.color+'" data-tip="'+esc(seg.key+': '+v)+'"></span>' : '';
+      }).join('');
+      return '<div class="wl-row" data-student="'+esc(n)+'"><div class="wl-name">'+esc(n)+'</div>'+
+        '<div class="wl-track" style="width:'+widthPct+'%">'+segs+'</div><div class="wl-total">'+d.total+'</div></div>';
+    }).join('') + '<div class="wl-legend">'+DONUT_SEGMENTS.map(function(seg){
+      return '<span><i class="dot" style="background:'+seg.color+'"></i>'+seg.key+'</span>';
+    }).join('')+'</div>';
+    bindTooltips(panel);
+    panel.querySelectorAll('.wl-row').forEach(function(row){
+      row.addEventListener('click', function(){ openStudentDetail(row.getAttribute('data-student'), 'overview'); });
+    });
+  }
+
+  function studentStats(name){
+    var tasks = state.tasks.filter(function(t){return t.studentName===name;});
+    var total = tasks.length;
+    var completed = tasks.filter(function(t){return t.status==='Submitted'||t.status==='Approved';}).length;
+    var overdue = tasks.filter(function(t){return computeBadge(t).role==='critical';}).length;
+    var dueSoon = tasks.filter(function(t){return computeBadge(t).role==='warning' && t.status!=='Submitted' && t.status!=='Approved';}).length;
+    var onTimeBase = tasks.filter(function(t){return t.submitTime && (t.status==='Submitted'||t.status==='Approved');});
+    var onTimeRate = onTimeBase.length ? Math.round(100*onTimeBase.filter(function(t){return computeBadge(t).text!=='Late';}).length/onTimeBase.length) : null;
+    var overall = total===0 ? {text:'No tasks yet', role:'neutral'} :
+      overdue>0 ? {text:'Behind', role:'critical'} :
+      dueSoon>0 ? {text:'At Risk', role:'warning'} : {text:'On Track', role:'good'};
+    return {total:total, completed:completed, overdue:overdue, dueSoon:dueSoon, onTimeRate:onTimeRate, overall:overall,
+      pct: total ? Math.round(100*completed/total) : 0};
+  }
+
+  /** Last 6 Sunday-start week keys, oldest first, ending at the current week. */
+  function last6WeekKeys(){
+    return lastNWeekKeys(6);
+  }
+  /** Last `count` Sunday-start week keys, oldest first, ending at the current week. */
+  function lastNWeekKeys(count){
+    var cur = weekKey(new Date()), keys = [];
+    for(var i=count-1;i>=0;i--) keys.push(shiftWeek(cur,-i));
+    return keys;
+  }
+  /**
+   * Generic week-by-week completion-rate strip (used for the Student Detail
+   * page's multi-week trend): one swatch per week, colored via the same
+   * heat-1..heat-4 scale as the monthly heatmap. The week label sits BELOW
+   * the swatch on the page's plain background, never on top of the colored
+   * swatch itself, so text contrast never depends on which heat step (or
+   * light/dark mode) is drawn.
+   */
+  function renderWeekStrip(tasks, weeks, containerId){
+    var el = document.getElementById(containerId);
+    el.style.gridTemplateColumns = 'repeat('+weeks.length+',1fr)';
+    el.innerHTML = weeks.map(function(wk){
+      var wkTasks = tasks.filter(function(t){return t.deadline && weekKey(parseDate(t.deadline))===wk;});
+      var completed = wkTasks.filter(function(t){return t.status==='Submitted'||t.status==='Approved';}).length;
+      var rate = wkTasks.length ? completed/wkTasks.length : null;
+      var cls = 'strip-swatch';
+      if(rate===null){ cls += ' swatch-empty'; }
+      else { cls += rate>=0.75?' heat-4':rate>=0.5?' heat-3':rate>=0.25?' heat-2':' heat-1'; }
+      var tip = weekRangeLabel(wk) + ': ' + (wkTasks.length ? (completed+'/'+wkTasks.length+' completed ('+Math.round(rate*100)+'%)') : 'no tasks due');
+      return '<div class="strip-item"><div class="'+cls+'" data-tip="'+esc(tip)+'"></div><div class="strip-lbl">'+weekShortLabel(wk)+'</div></div>';
+    }).join('');
+    bindTooltips(el);
+  }
+  /** Small 6-week completion-rate trend line for a student card, with per-point hover tooltips. */
+  function studentSparkline(name){
+    var weeks = last6WeekKeys();
+    var w = 140, h = 26, padY = 4;
+    var xStep = w / (weeks.length - 1);
+    var pts = weeks.map(function(wk, i){
+      var tasks = state.tasks.filter(function(t){return t.studentName===name && t.deadline && weekKey(parseDate(t.deadline))===wk;});
+      var completed = tasks.filter(function(t){return t.status==='Submitted'||t.status==='Approved';}).length;
+      var rate = tasks.length ? completed/tasks.length : null;
+      var y = rate===null ? h/2 : (padY + (1-rate)*(h-2*padY));
+      return {x:i*xStep, y:y, week:wk, total:tasks.length, completed:completed, rate:rate};
+    });
+    // Draw the line only across consecutive weeks that actually have tasks —
+    // weeks with no tasks break the line rather than falsely reading as 0%.
+    var segments = [], current = [];
+    pts.forEach(function(p){
+      if(p.rate===null){ if(current.length){ segments.push(current); current=[]; } }
+      else current.push(p);
+    });
+    if(current.length) segments.push(current);
+    var pathsSvg = segments.map(function(seg){
+      var d = seg.map(function(c,i){ return (i===0?'M':'L') + c.x.toFixed(1) + ',' + c.y.toFixed(1); }).join(' ');
+      var areaD = d + ' L' + seg[seg.length-1].x.toFixed(1) + ',' + h + ' L' + seg[0].x.toFixed(1) + ',' + h + ' Z';
+      return '<path class="spark-area" d="'+areaD+'"/><path class="spark-line" d="'+d+'"/>';
+    }).join('');
+    // Dots are plain HTML (positioned by percentage), not SVG shapes — the SVG
+    // above is stretched non-uniformly (preserveAspectRatio="none") to fill the
+    // box, which would otherwise squash circular <circle> marks into ellipses.
+    var dots = pts.map(function(p){
+      var tip = weekShortLabel(p.week) + ': ' + (p.total ? (p.completed+'/'+p.total+' completed ('+Math.round(p.rate*100)+'%)') : 'no tasks assigned');
+      var leftPct = (p.x/w*100).toFixed(2), topPct = (p.y/h*100).toFixed(2);
+      return '<div class="spark-dot'+(p.rate===null?' spark-dot-empty':'')+'" data-tip="'+esc(tip)+'" style="left:'+leftPct+'%;top:'+topPct+'%"></div>';
+    }).join('');
+    return '<div class="spark-wrap"><div class="spark-plot">'+
+      '<svg class="spark-svg" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'+pathsSvg+'</svg>'+dots+
+      '</div><div class="spark-lbl"><span>'+weekShortLabel(weeks[0])+'</span><span>6-week trend</span><span>'+weekShortLabel(weeks[weeks.length-1])+'</span></div></div>';
+  }
+
+  function renderStudentCards(){
+    var names = studentNames();
+    var el = document.getElementById('student-cards');
+    if(!names.length){ el.innerHTML = '<div class="muted" style="padding:20px;">No students yet — add a task to get started.</div>'; return; }
+    el.innerHTML = names.map(function(name){
+      var s = studentStats(name);
+      return '<div class="student-card" data-student="'+esc(name)+'">'+
+        '<div class="sc-top"><div class="avatar" style="background:'+studentColor(name)+'">'+initials(name)+'</div>'+
+        '<div><div class="sc-name">'+esc(name)+'</div>'+
+        '<div class="sc-badge"><i class="dot" style="background:'+roleColor(s.overall.role)+'"></i>'+s.overall.text+'</div></div></div>'+
+        '<div class="track"><div class="fill" style="width:'+s.pct+'%;background:'+roleColor(s.overall.role)+'"></div></div>'+
+        '<div class="sc-meta"><span>'+s.completed+' / '+s.total+' done</span><span>'+(s.onTimeRate===null?'—':s.onTimeRate+'% on-time')+'</span></div>'+
+        studentSparkline(name)+
+        '</div>';
+    }).join('');
+    bindTooltips(el);
+    el.querySelectorAll('.student-card').forEach(function(card){
+      card.addEventListener('click', function(){
+        openStudentDetail(card.getAttribute('data-student'), 'overview');
+      });
+    });
+  }
+
+  function renderWeekly(){
+    document.getElementById('wk-label').textContent = weekRangeLabel(state.selectedWeek);
+    var isCurrentWeek = state.selectedWeek === weekKey(new Date());
+    document.getElementById('wk-label').classList.toggle('is-current', isCurrentWeek);
+    document.getElementById('wk-today').toggleAttribute('hidden', isCurrentWeek);
+    renderWeeklyLoadStrip();
+    var names = studentNames();
+    var rowsEl = document.getElementById('weekly-rows');
+    var weekTasks = state.tasks.filter(function(t){return t.deadline && weekKey(parseDate(t.deadline))===state.selectedWeek;});
+    if(!names.length){ rowsEl.innerHTML = '<div class="muted">No students yet.</div>'; }
+    else{
+      rowsEl.innerHTML = names.map(function(name){
+        var tasks = weekTasks.filter(function(t){return t.studentName===name;});
+        var completed = tasks.filter(function(t){return t.status==='Submitted'||t.status==='Approved';}).length;
+        var pct = tasks.length ? Math.round(100*completed/tasks.length) : 0;
+        var overdue = tasks.some(function(t){return computeBadge(t).role==='critical';});
+        var barColor = !tasks.length ? 'var(--text-muted)' : overdue ? 'var(--status-critical)' : (pct>=100 ? 'var(--status-good)' : 'var(--status-info)');
+        return '<div class="wk-row"><div class="wk-name" data-student-link="'+esc(name)+'"><span class="dot" style="background:'+studentColor(name)+'"></span>'+esc(name)+'</div>'+
+          '<div class="track"><div class="fill" style="width:'+pct+'%;background:'+barColor+'"></div></div>'+
+          '<div class="wk-count">'+completed+' / '+tasks.length+'</div></div>';
+      }).join('');
+      bindStudentLinks(rowsEl);
+    }
+    var wkStudentSel = document.getElementById('wk-f-student');
+    var curSel = wkStudentSel.value;
+    wkStudentSel.innerHTML = '<option value="">All students</option>' + names.map(function(n){return '<option>'+esc(n)+'</option>';}).join('');
+    wkStudentSel.value = curSel;
+    renderWeeklyTaskTable(weekTasks);
+  }
+
+  /** Applies the wk-f-* filters (student/status/timeliness/search) to the
+   * "Tasks due this week" table only — the day-load strip and per-student
+   * progress rows above stay showing the whole week regardless. */
+  function renderWeeklyTaskTable(weekTasks){
+    weekTasks = weekTasks || state.tasks.filter(function(t){return t.deadline && weekKey(parseDate(t.deadline))===state.selectedWeek;});
+    var studentSel = document.getElementById('wk-f-student').value;
+    var statusSel = document.getElementById('wk-f-status').value;
+    var timeSel = document.getElementById('wk-f-timeliness').value;
+    var q = document.getElementById('wk-f-search').value;
+    var scoped = studentSel ? weekTasks.filter(function(t){return t.studentName===studentSel;}) : weekTasks;
+    var rows = filterTasks(scoped, statusSel, timeSel, q);
+    var body = document.getElementById('weekly-task-body');
+    if(!rows.length){ body.innerHTML = '<tr class="empty-row"><td colspan="4">'+(weekTasks.length?'No matching tasks.':'No tasks due this week.')+'</td></tr>'; }
+    else{ body.innerHTML = renderFamilyRows(rows, taskRow); bindTaskRows(body, function(){ renderWeeklyTaskTable(); }); bindStudentLinks(body); }
+  }
+
+  /**
+   * Sun–Sat "load strip" for the selected week: one swatch per day, now a
+   * small stacked bar (done / pending / overdue) instead of a bare count, so
+   * the number carries a story — "3 done, 1 overdue" instead of just "4".
+   * Clicking a day opens the same day-detail list the calendar uses.
+   */
+  function renderWeeklyLoadStrip(){
+    var sun = parseDate(state.selectedWeek);
+    var days = [];
+    for(var i=0;i<7;i++){ var d = new Date(sun); d.setDate(sun.getDate()+i); days.push(d); }
+    var todayIso = todayISO();
+    var el = document.getElementById('week-load-strip');
+    el.innerHTML = days.map(function(d){
+      var iso = toISODate(d);
+      var dayTasks = state.tasks.filter(function(t){return t.deadline===iso;});
+      var n = dayTasks.length;
+      var completed = dayTasks.filter(function(t){return t.status==='Submitted'||t.status==='Approved';}).length;
+      var overdue = dayTasks.filter(function(t){return computeBadge(t).role==='critical';}).length;
+      var pending = n - completed - overdue;
+      var isToday = iso === todayIso;
+      var segs = n ?
+        (completed?'<span class="load-seg" style="flex:'+completed+' 0 0;background:var(--status-good)"></span>':'')+
+        (pending?'<span class="load-seg" style="flex:'+pending+' 0 0;background:var(--status-info)"></span>':'')+
+        (overdue?'<span class="load-seg" style="flex:'+overdue+' 0 0;background:var(--status-critical)"></span>':'')
+        : '<span class="load-seg swatch-empty" style="flex:1 0 0;"></span>';
+      var subText = !n ? 'no tasks' : overdue ? overdue+' overdue' : pending ? pending+' pending' : 'all done';
+      var tip = d.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'}) + ': ' +
+        (n ? (completed+' done'+(overdue?', '+overdue+' overdue':'')+(pending?', '+pending+' pending':'')+' of '+n) : 'no tasks due');
+      return '<div class="load-cell'+(isToday?' load-today':'')+'" data-tip="'+esc(tip)+'" data-day="'+iso+'">'+
+        '<div class="load-day">'+d.toLocaleDateString(undefined,{weekday:'short'})+'</div>'+
+        '<div class="load-bar">'+segs+'</div>'+
+        '<div class="load-num">'+(n? completed+'/'+n : '—')+'</div>'+
+        '<div class="load-sub">'+subText+'</div>'+
+        '</div>';
+    }).join('');
+    bindTooltips(el);
+    el.querySelectorAll('[data-day]').forEach(function(cell){
+      cell.addEventListener('click', function(){ openDayDetail(cell.getAttribute('data-day')); });
+    });
+  }
+
+  function renderMonthly(){
+    document.getElementById('mo-label').textContent = monthLabelText(state.selectedMonth);
+    var isCurrentMonth = state.selectedMonth === todayMonth();
+    document.getElementById('mo-label').classList.toggle('is-current', isCurrentMonth);
+    document.getElementById('mo-today').toggleAttribute('hidden', isCurrentMonth);
+
+    // --- Chart 1: month-over-month trend (6-month rolling window ending at the selected month) ---
+    var months = monthsWindow(state.selectedMonth, 6);
+    var chart = document.getElementById('month-chart');
+    var data = months.map(function(m){
+      var tasks = state.tasks.filter(function(t){return t.deadline && t.deadline.slice(0,7)===m;});
+      var completed = tasks.filter(function(t){return t.status==='Submitted'||t.status==='Approved';}).length;
+      return {month:m, total:tasks.length, completed:completed};
+    });
+    var max = Math.max(1, Math.max.apply(null, data.map(function(d){return d.total;})));
+    chart.innerHTML = data.map(function(d){
+      var trackH = Math.round(120 * d.total/max), fillH = Math.round(120 * d.completed/max);
+      var isSelected = d.month === state.selectedMonth;
+      return '<div class="bar-group"><div class="bar-stack" data-tip="'+monthLabelText(d.month)+': '+d.completed+' of '+d.total+' completed">'+
+        '<div class="bar-track" style="height:'+trackH+'px'+(isSelected?';opacity:1':'')+'"></div><div class="bar-fill" style="height:'+fillH+'px"></div></div>'+
+        '<div class="bar-wk-lbl" style="'+(isSelected?'color:var(--text-primary);font-weight:600;':'')+'">'+monthShortLabel(d.month)+'</div></div>';
+    }).join('');
+    bindTooltips(chart);
+
+    renderMonthlyCalendar();
+
+    // --- Chart 2: student × week heatmap for the selected month only ---
+    document.getElementById('heatmap-title').textContent = 'Weekly breakdown — ' + monthLabelText(state.selectedMonth);
+    var weeks = weeksInMonth(state.selectedMonth);
+    var names = studentNames();
+    var heat = document.getElementById('month-heatmap');
+    heat.style.setProperty('--heat-cols', weeks.length);
+    if(!names.length){
+      heat.innerHTML = '<div class="muted" style="padding:10px 0;">No students yet.</div>';
+    } else {
+      var headerRow = '<div class="heat-header-row"><div></div>' +
+        weeks.map(function(wk){ return '<div class="heat-col-lbl">'+weekShortLabel(wk)+'</div>'; }).join('') + '</div>';
+      var rows = names.map(function(name){
+        var cells = weeks.map(function(wk){
+          var tasks = state.tasks.filter(function(t){return t.studentName===name && t.deadline && weekKey(parseDate(t.deadline))===wk;});
+          var completed = tasks.filter(function(t){return t.status==='Submitted'||t.status==='Approved';}).length;
+          var rate = tasks.length ? completed/tasks.length : null;
+          var cls = 'heat-cell';
+          if(rate!==null){
+            cls += rate>=0.75 ? ' heat-4' : rate>=0.5 ? ' heat-3' : rate>=0.25 ? ' heat-2' : ' heat-1';
+          }
+          var tip = esc(name) + ' • ' + weekRangeLabel(wk) + ': ' + (tasks.length ? (completed+'/'+tasks.length+' completed ('+Math.round(rate*100)+'%)') : 'no tasks assigned');
+          return '<div class="'+cls+'" data-tip="'+tip+'"></div>';
+        }).join('');
+        return '<div class="heat-row"><div class="heat-row-lbl" data-student-link="'+esc(name)+'"><span class="dot" style="background:'+studentColor(name)+'"></span>'+esc(name)+'</div>'+cells+'</div>';
+      }).join('');
+      heat.innerHTML = headerRow + rows;
+      bindTooltips(heat);
+      bindStudentLinks(heat);
+    }
+
+    // --- Per-student summary table for the selected month ---
+    renderMonthlyStudentTable(names);
+  }
+
+  /** Applies the mo-f-student name filter to the per-student summary table. */
+  function renderMonthlyStudentTable(names){
+    names = names || studentNames();
+    var q = document.getElementById('mo-f-student').value.trim().toLowerCase();
+    var filtered = q ? names.filter(function(n){ return n.toLowerCase().indexOf(q) > -1; }) : names;
+    var body = document.getElementById('monthly-student-body');
+    if(!names.length){ body.innerHTML = '<tr class="empty-row"><td colspan="5">No students yet.</td></tr>'; return; }
+    if(!filtered.length){ body.innerHTML = '<tr class="empty-row"><td colspan="5">No matching students.</td></tr>'; return; }
+    body.innerHTML = filtered.map(function(name){
+      var tasks = state.tasks.filter(function(t){return t.studentName===name && t.deadline && t.deadline.slice(0,7)===state.selectedMonth;});
+      var completed = tasks.filter(function(t){return t.status==='Submitted'||t.status==='Approved';}).length;
+      var onTimeBase = tasks.filter(function(t){return t.submitTime && (t.status==='Submitted'||t.status==='Approved');});
+      var onTimeRate = onTimeBase.length ? Math.round(100*onTimeBase.filter(function(t){return computeBadge(t).text!=='Late';}).length/onTimeBase.length) : null;
+      var pct = tasks.length ? Math.round(100*completed/tasks.length) : 0;
+      return '<tr><td><span class="name-cell" data-student-link="'+esc(name)+'"><span class="avatar-sm" style="background:'+studentColor(name)+'">'+initials(name)+'</span>'+esc(name)+'</span></td>'+
+        '<td>'+completed+'</td><td>'+tasks.length+'</td><td>'+pct+'%</td><td>'+(onTimeRate===null?'—':onTimeRate+'%')+'</td></tr>';
+    }).join('');
+    bindStudentLinks(body);
+  }
+
+  /**
+   * Full Sun–Sat calendar grid for the selected month. Each day shows small
+   * status-colored dots (one per task due that day) plus a count — color is
+   * never the only signal: the legend below the grid and each dot's own
+   * status text are always available via hover.
+   */
+  function renderMonthlyCalendar(){
+    var first = new Date(state.selectedMonth+'-01T00:00:00');
+    var gridStart = new Date(first); gridStart.setDate(gridStart.getDate() - gridStart.getDay());
+    var days = [];
+    for(var i=0;i<42;i++){ var d = new Date(gridStart); d.setDate(gridStart.getDate()+i); days.push(d); }
+    // Drop a trailing 6th row if it's entirely outside the month.
+    while(days.length > 35){
+      var lastWeek = days.slice(days.length-7);
+      var allOutside = lastWeek.every(function(dd){ return dd.getMonth() !== first.getMonth(); });
+      if(allOutside) days = days.slice(0, days.length-7); else break;
+    }
+    var todayIso = todayISO();
+    var dowLbls = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var header = dowLbls.map(function(l){ return '<div class="cal-dow">'+l+'</div>'; }).join('');
+    var cells = days.map(function(d){
+      var iso = toISODate(d);
+      var outside = d.getMonth() !== first.getMonth();
+      var isToday = iso === todayIso;
+      var dayTasks = state.tasks.filter(function(t){return t.deadline===iso;});
+      var dots = dayTasks.slice(0,8).map(function(t){
+        return '<span class="cal-dot" style="background:'+roleColor(computeBadge(t).role)+'"></span>';
+      }).join('');
+      var overflow = dayTasks.length > 8 ? '<span class="cal-more">+'+(dayTasks.length-8)+'</span>' : '';
+      var tip = d.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'}) +
+        (dayTasks.length ? ': ' + dayTasks.length + ' task'+(dayTasks.length===1?'':'s')+' due — click for details' : ': no tasks due');
+      return '<div class="cal-day'+(outside?' cal-outside':'')+(isToday?' cal-today':'')+(dayTasks.length?' cal-has-tasks':'')+'" '+
+        'data-tip="'+esc(tip)+'" data-day="'+iso+'" tabindex="0" role="button" aria-label="'+esc(tip)+'">'+
+        '<div class="cal-daynum">'+d.getDate()+'</div>'+
+        '<div class="cal-dots">'+dots+overflow+'</div>'+
+        '</div>';
+    }).join('');
+    var el = document.getElementById('month-calendar');
+    el.innerHTML = header + cells;
+    bindTooltips(el);
+    el.querySelectorAll('[data-day]').forEach(function(cell){
+      cell.addEventListener('click', function(){ openDayDetail(cell.getAttribute('data-day')); });
+      cell.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openDayDetail(cell.getAttribute('data-day')); } });
+    });
+  }
+
+  /* ---------- day detail (calendar day / weekly load cell click) ---------- */
+  var dayOverlay = document.getElementById('day-overlay');
+  function openDayDetail(iso){
+    if(!iso) return;
+    var d = parseDate(iso);
+    document.getElementById('day-title').textContent = d ? d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}) : iso;
+    var dayTasks = state.tasks.filter(function(t){return t.deadline===iso;}).sort(function(a,b){
+      return (a.studentName||'').localeCompare(b.studentName||'');
+    });
+    var list = document.getElementById('day-task-list');
+    if(!dayTasks.length){
+      list.innerHTML = '<div class="muted" style="padding:14px 4px;">No tasks due this day.</div>';
+    } else {
+      list.innerHTML = dayTasks.map(function(t){
+        var badge = computeBadge(t);
+        var name = t.taskName||'(untitled)';
+        if(t.stepName) name += ' — ' + t.stepName;
+        return '<div class="day-task-row" data-id="'+esc(t.id)+'">'+
+          '<span class="avatar-sm" style="background:'+studentColor(t.studentName)+'">'+initials(t.studentName)+'</span>'+
+          '<div class="day-task-main"><div class="day-task-name">'+esc(name)+'</div>'+
+          '<div class="day-task-student">'+esc(t.studentName||'—')+'</div></div>'+
+          '<span class="badge"><i class="dot" style="background:'+roleColor(badge.role)+'"></i>'+badge.text+'</span>'+
+          '</div>';
+      }).join('');
+      list.querySelectorAll('[data-id]').forEach(function(row){
+        row.addEventListener('click', function(){
+          closeDayDetail();
+          openTaskModal(row.getAttribute('data-id'));
+        });
+      });
+    }
+    dayOverlay.classList.add('show');
+  }
+  function closeDayDetail(){ dayOverlay.classList.remove('show'); }
+  document.getElementById('day-close').addEventListener('click', closeDayDetail);
+  document.getElementById('day-done').addEventListener('click', closeDayDetail);
+  dayOverlay.addEventListener('click', function(e){ if(e.target===dayOverlay) closeDayDetail(); });
+
+  function bindTooltips(container){
+    var tip = document.getElementById('tooltip');
+    container.querySelectorAll('[data-tip]').forEach(function(elm){
+      elm.addEventListener('mousemove', function(e){
+        tip.textContent = elm.getAttribute('data-tip');
+        tip.style.left = (e.clientX+12)+'px'; tip.style.top = (e.clientY+12)+'px'; tip.style.display='block';
+      });
+      elm.addEventListener('mouseleave', function(){ tip.style.display='none'; });
+    });
+  }
+
+  function byDeadline(a,b){
+    if(!a.deadline) return 1; if(!b.deadline) return -1;
+    return a.deadline.localeCompare(b.deadline);
+  }
+
+  /* ---------- task families / steps ---------- */
+  // A "family" is one long task broken into steps: the first-created row is
+  // the root (parentId blank), every step after it stores parentId = the
+  // root's id. taskName stays shared across the family; stepName labels each
+  // individual step. A task with no steps is simply a family of one.
+  // Which multi-step families the user has expanded, keyed by root id. Starts
+  // empty (every family collapsed) so a screen full of multi-step tasks
+  // doesn't turn into a wall of step rows — expand only the ones you want.
+  var expandedFamilies = {};
+  function familyRootId(t){ return t.parentId || t.id; }
+  function familyMembers(rootId){
+    return state.tasks.filter(function(t){ return t.id===rootId || t.parentId===rootId; });
+  }
+  function familyMembersSorted(rootId){
+    return familyMembers(rootId).slice().sort(function(a,b){
+      if(a.id===rootId) return -1; if(b.id===rootId) return 1;
+      return byDeadline(a,b);
+    });
+  }
+  function familyProgress(rootId){
+    var members = familyMembers(rootId);
+    var done = members.filter(function(t){return t.status==='Submitted'||t.status==='Approved';}).length;
+    return {done:done, total:members.length};
+  }
+  /**
+   * Reorders a task list so family members sit adjacent (root first, then
+   * steps by deadline), and families are ordered by their earliest deadline.
+   * Progress counts (familyProgress) still look at the FULL task list, so an
+   * "X/Y steps" badge stays accurate even if a sibling step isn't in `tasks`
+   * (e.g. it's due in a different week than the one currently filtered to).
+   */
+  function groupByFamily(tasks){
+    var byRoot = {}, order = [];
+    tasks.forEach(function(t){
+      var root = familyRootId(t);
+      if(!byRoot[root]){ byRoot[root] = []; order.push(root); }
+      byRoot[root].push(t);
+    });
+    var families = order.map(function(root){
+      var members = byRoot[root].slice().sort(function(a,b){
+        if(a.id===root) return -1; if(b.id===root) return 1;
+        return byDeadline(a,b);
+      });
+      var earliest = members.reduce(function(min,t){
+        if(!t.deadline) return min;
+        return (min===null || t.deadline < min) ? t.deadline : min;
+      }, null);
+      return {root:root, members:members, earliest:earliest};
+    });
+    families.sort(function(a,b){
+      if(!a.earliest) return 1; if(!b.earliest) return -1;
+      return a.earliest.localeCompare(b.earliest);
+    });
+    var out = [];
+    families.forEach(function(f){ f.members.forEach(function(t){ out.push(t); }); });
+    return out;
+  }
+  /**
+   * Renders one <tr> per task via rowFn(t, meta), grouping family members
+   * together first. Step rows are collapsed by default (see
+   * `expandedFamilies`) UNLESS this row's root task didn't survive whatever
+   * filter produced `tasks` — in that case the step is the only evidence the
+   * family matched at all, so it always shows regardless of expand state.
+   */
+  function renderFamilyRows(tasks, rowFn){
+    var grouped = groupByFamily(tasks);
+    var rootPresent = {};
+    tasks.forEach(function(t){ if(!t.parentId) rootPresent[t.id] = true; });
+    var seen = {};
+    return grouped.map(function(t){
+      var root = familyRootId(t);
+      var isChild = !!t.parentId;
+      var isFirst = !seen[root]; seen[root] = true;
+      var prog = familyProgress(root);
+      var standalone = isChild && !rootPresent[root];
+      var expanded = standalone || prog.total <= 1 || !!expandedFamilies[root];
+      if(isChild && !expanded) return '';
+      return rowFn(t, {isChild:isChild, isFirst:isFirst, familySize:prog.total, famDone:prog.done, root:root, expanded:expanded, standalone:standalone});
+    }).join('');
+  }
+  /** Task-name cell: child rows show an indent connector + step label (plus the
+   * family's task name when shown without its root, e.g. a filtered-in step);
+   * multi-step roots show an X/Y badge that expands/collapses the steps. */
+  function famNameCell(t, meta){
+    meta = meta || {};
+    if(meta.isChild){
+      var prefix = meta.standalone ? esc(t.taskName||'(untitled)')+' ' : '';
+      return prefix + '<span class="fam-step"><span class="fam-connector">↳</span>'+esc(t.stepName||'Step')+'</span>';
+    }
+    var countBadge = '';
+    if(meta.familySize > 1){
+      var expanded = !!meta.expanded;
+      countBadge = ' <button type="button" class="fam-toggle" data-toggle-fam="'+esc(meta.root)+'" aria-expanded="'+expanded+'" aria-label="'+(expanded?'Collapse steps':'Expand steps')+'">'+
+        '<span class="fam-count">'+meta.famDone+'/'+meta.familySize+' steps</span>'+
+        '<span class="fam-chevron">'+(expanded?'▾':'▸')+'</span></button>';
+    }
+    return esc(t.taskName||'(untitled)') + countBadge;
+  }
+
+  function bindStudentLinks(container){
+    container.querySelectorAll('[data-student-link]').forEach(function(elm){
+      elm.addEventListener('click', function(e){
+        e.stopPropagation();
+        openStudentDetail(elm.getAttribute('data-student-link'), state.view);
+      });
+    });
+  }
+
+  function taskRow(t, meta){
+    var badge = computeBadge(t);
+    return '<tr data-id="'+esc(t.id)+'"'+(meta&&meta.isChild?' class="fam-child-row"':'')+'>'+
+      '<td>'+famNameCell(t, meta)+'</td>'+
+      '<td><span class="name-cell" data-student-link="'+esc(t.studentName)+'"><span class="avatar-sm" style="background:'+studentColor(t.studentName)+'">'+initials(t.studentName)+'</span>'+esc(t.studentName||'—')+'</span></td>'+
+      '<td class="muted">'+(t.deadline||'—')+'</td>'+
+      '<td><span class="badge"><i class="dot" style="background:'+roleColor(badge.role)+'"></i>'+badge.text+'</span></td>'+
+      '</tr>';
+  }
+  function taskRowFull(t, meta){
+    var badge = computeBadge(t);
+    return '<tr data-id="'+esc(t.id)+'"'+(meta&&meta.isChild?' class="fam-child-row"':'')+'>'+
+      '<td>'+famNameCell(t, meta)+'</td>'+
+      '<td><span class="name-cell" data-student-link="'+esc(t.studentName)+'"><span class="avatar-sm" style="background:'+studentColor(t.studentName)+'">'+initials(t.studentName)+'</span>'+esc(t.studentName||'—')+'</span></td>'+
+      '<td class="muted">'+(t.startDate||'—')+'</td>'+
+      '<td class="muted">'+(t.deadline||'—')+'</td>'+
+      '<td class="muted">'+(t.submitTime ? new Date(t.submitTime).toLocaleString() : '—')+'</td>'+
+      '<td><span class="badge"><i class="dot" style="background:'+roleColor(badge.role)+'"></i>'+badge.text+'</span></td>'+
+      '<td class="muted">'+(t.deadline ? 'Wk of '+weekShortLabel(weekKey(parseDate(t.deadline))) : '—')+'</td>'+
+      '</tr>';
+  }
+  /** Same as taskRowFull but without the Student column — used on the Student Detail page. */
+  function taskRowStudent(t, meta){
+    var badge = computeBadge(t);
+    return '<tr data-id="'+esc(t.id)+'"'+(meta&&meta.isChild?' class="fam-child-row"':'')+'>'+
+      '<td>'+famNameCell(t, meta)+'</td>'+
+      '<td class="muted">'+(t.startDate||'—')+'</td>'+
+      '<td class="muted">'+(t.deadline||'—')+'</td>'+
+      '<td class="muted">'+(t.submitTime ? new Date(t.submitTime).toLocaleString() : '—')+'</td>'+
+      '<td><span class="badge"><i class="dot" style="background:'+roleColor(badge.role)+'"></i>'+badge.text+'</span></td>'+
+      '<td class="muted">'+(t.deadline ? 'Wk of '+weekShortLabel(weekKey(parseDate(t.deadline))) : '—')+'</td>'+
+      '</tr>';
+  }
+  /** `onFamilyToggle`, if given, re-renders just this table after a step-family
+   * expand/collapse click; defaults to a full renderAll() when omitted. */
+  function bindTaskRows(body, onFamilyToggle){
+    body.querySelectorAll('tr[data-id]').forEach(function(row){
+      row.addEventListener('click', function(){ openTaskModal(row.getAttribute('data-id')); });
+    });
+    body.querySelectorAll('[data-toggle-fam]').forEach(function(btn){
+      btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        var root = btn.getAttribute('data-toggle-fam');
+        expandedFamilies[root] = !expandedFamilies[root];
+        (onFamilyToggle || renderAll)();
+      });
+    });
+  }
+
+  function renderAllTasks(){
+    var studentSel = document.getElementById('f-student').value;
+    var statusSel = document.getElementById('f-status').value;
+    var timeSel = document.getElementById('f-timeliness').value;
+    var q = document.getElementById('f-search').value;
+    var scoped = studentSel ? state.tasks.filter(function(t){return t.studentName===studentSel;}) : state.tasks;
+    var rows = filterTasks(scoped, statusSel, timeSel, q);
+    var body = document.getElementById('all-task-body');
+    if(!rows.length){ body.innerHTML = '<tr class="empty-row"><td colspan="7">No matching tasks.</td></tr>'; }
+    else{ body.innerHTML = renderFamilyRows(rows, taskRowFull); bindTaskRows(body, renderAllTasks); bindStudentLinks(body); }
+  }
+
+  function renderStudentDatalist(){
+    // The autocomplete list includes roster-only names (no tasks yet) so a
+    // name typed on a new task matches the roster exactly and its email
+    // notification actually fires. The All Tasks filter dropdown stays
+    // task-only — no point filtering by someone with zero tasks.
+    document.getElementById('student-list').innerHTML = teamNames().map(function(n){return '<option value="'+esc(n)+'">';}).join('');
+    var sel = document.getElementById('f-student');
+    var current = sel.value;
+    var names = studentNames();
+    sel.innerHTML = '<option value="">All students</option>' + names.map(function(n){return '<option>'+esc(n)+'</option>';}).join('');
+    sel.value = current;
+  }
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+
+  /* ---------- tabs / views ---------- */
+  function switchView(view){
+    state.view = view;
+    document.querySelectorAll('.tab').forEach(function(b){b.classList.toggle('active', b.getAttribute('data-view')===view);});
+    document.querySelectorAll('.view').forEach(function(v){v.classList.toggle('active', v.id==='view-'+view);});
+  }
+  document.querySelectorAll('.tab').forEach(function(b){
+    b.addEventListener('click', function(){ switchView(b.getAttribute('data-view')); });
+  });
+
+  /* ---------- student detail (drill-down) ---------- */
+  function openStudentDetail(name, fromView){
+    if(!name) return;
+    state.studentDetailFrom = fromView || (state.view!=='student' ? state.view : state.studentDetailFrom) || 'overview';
+    if(state.detailStudent !== name){
+      // Fresh student — don't carry the previous student's table filters over.
+      document.getElementById('sd-f-status').value = '';
+      document.getElementById('sd-f-timeliness').value = '';
+      document.getElementById('sd-f-search').value = '';
+    }
+    state.detailStudent = name;
+    switchView('student');
+    renderStudentDetail();
+  }
+  document.getElementById('btn-student-back').addEventListener('click', function(){
+    switchView(state.studentDetailFrom || 'overview');
+  });
+
+  function renderStudentDetail(){
+    var name = state.detailStudent;
+    if(!name) return;
+    var s = studentStats(name);
+    document.getElementById('sd-name').textContent = name;
+    var avatar = document.getElementById('sd-avatar');
+    avatar.textContent = initials(name);
+    avatar.style.background = studentColor(name);
+    document.getElementById('sd-badge-dot').style.background = roleColor(s.overall.role);
+    document.getElementById('sd-badge-text').textContent = s.overall.text;
+
+    document.getElementById('sd-stats').innerHTML =
+      '<div class="stat-tile"><div class="num">'+s.total+'</div><div class="lbl">Total tasks</div></div>'+
+      statMeterTile({id:'sd-completed', num:s.completed, sub:'of '+s.total, lbl:'Completed', pct: s.total?Math.round(100*s.completed/s.total):0, color:'var(--status-good)'})+
+      statMeterTile({id:'sd-overdue', num:s.overdue, sub:'of '+s.total, lbl:'Overdue', pct: s.total?Math.round(100*s.overdue/s.total):0, color:'var(--status-critical)'})+
+      statMeterTile({id:'sd-ontime', noClick:true, num:s.onTimeRate===null?'—':s.onTimeRate+'%', sub:'on-time', lbl:'On-time rate', pct:s.onTimeRate||0, color:'var(--status-good)'});
+    bindStatClick('stat-tile-sd-completed', function(){ setSdFilterAndScroll('__completed', ''); });
+    bindStatClick('stat-tile-sd-overdue', function(){ setSdFilterAndScroll('', 'Overdue'); });
+
+    var tasks = state.tasks.filter(function(t){return t.studentName===name;});
+    renderDonut(tasks, 'sd-donut', 'sd-donut-legend');
+    renderWeekStrip(tasks, lastNWeekKeys(10), 'sd-strip');
+    renderStudentDetailTaskTable(tasks);
+  }
+
+  /** Applies the sd-f-* filters (status/timeliness/search) to this student's
+   * "All tasks" table — the donut and 10-week trend above stay whole-history. */
+  function renderStudentDetailTaskTable(tasks){
+    tasks = tasks || state.tasks.filter(function(t){return t.studentName===state.detailStudent;});
+    var statusSel = document.getElementById('sd-f-status').value;
+    var timeSel = document.getElementById('sd-f-timeliness').value;
+    var q = document.getElementById('sd-f-search').value;
+    var rows = filterTasks(tasks, statusSel, timeSel, q);
+    var body = document.getElementById('sd-task-body');
+    if(!rows.length){ body.innerHTML = '<tr class="empty-row"><td colspan="6">'+(tasks.length?'No matching tasks.':'No tasks yet.')+'</td></tr>'; }
+    else{ body.innerHTML = renderFamilyRows(rows, taskRowStudent); bindTaskRows(body, function(){ renderStudentDetailTaskTable(); }); }
+  }
+  /** Completed/Overdue stat tiles on the student page filter + scroll to the
+   * table below, rather than navigating away — the whole point of a detail
+   * page is staying on it. */
+  function setSdFilterAndScroll(status, timeliness){
+    document.getElementById('sd-f-status').value = status;
+    document.getElementById('sd-f-timeliness').value = timeliness;
+    document.getElementById('sd-f-search').value = '';
+    renderStudentDetailTaskTable();
+    var el = document.getElementById('sd-tasks-title');
+    if(el && el.scrollIntoView) el.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  /* ---------- week / month nav ---------- */
+  document.getElementById('wk-prev').addEventListener('click', function(){ state.selectedWeek = shiftWeek(state.selectedWeek,-1); renderWeekly(); });
+  document.getElementById('wk-next').addEventListener('click', function(){ state.selectedWeek = shiftWeek(state.selectedWeek,1); renderWeekly(); });
+  document.getElementById('wk-today').addEventListener('click', function(){ state.selectedWeek = weekKey(new Date()); renderWeekly(); });
+  document.getElementById('mo-prev').addEventListener('click', function(){ state.selectedMonth = shiftMonth(state.selectedMonth,-1); renderMonthly(); });
+  document.getElementById('mo-next').addEventListener('click', function(){ state.selectedMonth = shiftMonth(state.selectedMonth,1); renderMonthly(); });
+  document.getElementById('mo-today').addEventListener('click', function(){ state.selectedMonth = todayMonth(); renderMonthly(); });
+
+  /* ---------- filters ---------- */
+  ['f-student','f-status','f-timeliness'].forEach(function(id){
+    document.getElementById(id).addEventListener('change', renderAllTasks);
+  });
+  document.getElementById('f-search').addEventListener('input', renderAllTasks);
+
+  ['wk-f-student','wk-f-status','wk-f-timeliness'].forEach(function(id){
+    document.getElementById(id).addEventListener('change', function(){ renderWeeklyTaskTable(); });
+  });
+  document.getElementById('wk-f-search').addEventListener('input', function(){ renderWeeklyTaskTable(); });
+
+  document.getElementById('mo-f-student').addEventListener('input', function(){ renderMonthlyStudentTable(); });
+
+  ['sd-f-status','sd-f-timeliness'].forEach(function(id){
+    document.getElementById(id).addEventListener('change', function(){ renderStudentDetailTaskTable(); });
+  });
+  document.getElementById('sd-f-search').addEventListener('input', function(){ renderStudentDetailTaskTable(); });
+
+  /* ---------- task modal ---------- */
+  var taskOverlay = document.getElementById('task-overlay');
+  /**
+   * opts (only used when id is null, i.e. creating a task) lets the "+ Add
+   * next step" flow pre-fill studentName/taskName/parentId so the new row
+   * joins an existing family instead of showing up as an unrelated task.
+   */
+  function openTaskModal(id, opts){
+    opts = opts || {};
+    state.editingId = id || null;
+    var t = id ? state.tasks.find(function(x){return x.id===id;}) : null;
+    document.getElementById('task-modal-title').textContent = t ? 'Edit task' : (opts.parentId ? 'Add next step' : 'Add task');
+    document.getElementById('f-parentId').value = t ? (t.parentId||'') : (opts.parentId||'');
+    var studentField = document.getElementById('f-studentName');
+    // A personal passcode can only ever add/edit its own tasks (Code.gs enforces this too, on
+    // every request) — lock the field to their name instead of letting them pick, edit it, and
+    // find out only after Save that the server rejected it.
+    studentField.value = isPersonal() ? state.myName : (t ? t.studentName||'' : (opts.studentName || document.getElementById('f-student').value||''));
+    studentField.readOnly = isPersonal();
+    document.getElementById('f-taskName').value = t ? t.taskName||'' : (opts.taskName||'');
+    document.getElementById('f-stepName').value = t ? t.stepName||'' : (opts.stepName||'');
+    document.getElementById('f-description').value = t ? t.description||'' : '';
+    document.getElementById('f-priority').value = t ? t.priority||'Medium' : 'Medium';
+    document.getElementById('f-startDate').value = t ? t.startDate||'' : todayISO();
+    document.getElementById('f-deadline').value = t ? t.deadline||'' : '';
+    document.getElementById('f-status2').value = t ? t.status||'Not Started' : 'Not Started';
+    document.getElementById('f-submitTime').value = t && t.submitTime ? toLocalInput(t.submitTime) : '';
+    document.getElementById('f-notes').value = t ? t.notes||'' : '';
+    document.getElementById('btn-delete-task').style.display = t ? 'inline-flex' : 'none';
+    document.getElementById('task-meta').textContent = t ? 'Created '+fmt(t.createdAt)+' · Updated '+fmt(t.updatedAt) : '';
+    renderStepsSection(t);
+    taskOverlay.classList.add('show');
+  }
+  function fmt(iso){ if(!iso) return '—'; var d = new Date(iso); return isNaN(d) ? iso : d.toLocaleString(); }
+  function toLocalInput(iso){
+    var d = new Date(iso); if(isNaN(d)) return '';
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+  }
+  function closeTaskModal(){ taskOverlay.classList.remove('show'); }
+  document.getElementById('btn-add-task').addEventListener('click', function(){ openTaskModal(null); });
+  document.getElementById('task-close').addEventListener('click', closeTaskModal);
+  document.getElementById('btn-cancel-task').addEventListener('click', closeTaskModal);
+  taskOverlay.addEventListener('click', function(e){ if(e.target===taskOverlay) closeTaskModal(); });
+
+  /**
+   * The "Steps in this task" box in the modal — lists every member of the
+   * task's family (itself included), lets you tick a step done in place
+   * without leaving the modal, and reopen a different step to edit it.
+   */
+  function renderStepsSection(t){
+    var section = document.getElementById('steps-section');
+    var list = document.getElementById('steps-list');
+    if(!t){ section.style.display = 'none'; list.innerHTML = ''; return; }
+    var root = familyRootId(t);
+    var members = familyMembersSorted(root);
+    section.style.display = 'block';
+    list.innerHTML = members.map(function(m){
+      var done = m.status==='Submitted' || m.status==='Approved';
+      var label = m.id===root ? (m.taskName||'(untitled)') + (m.stepName ? ' — '+m.stepName : '') : (m.stepName||'Step');
+      var isCurrent = m.id === t.id;
+      var badge = computeBadge(m);
+      return '<div class="step-row'+(isCurrent?' step-row-current':'')+'" data-step-id="'+esc(m.id)+'">'+
+        '<span class="step-check" data-toggle-id="'+esc(m.id)+'" style="'+(done?'background:var(--status-good);border-color:var(--status-good);':'')+'" data-tip="'+(done?'Mark not done':'Mark done')+'"></span>'+
+        '<span class="step-label" style="'+(done?'text-decoration:line-through;color:var(--text-muted);':'')+'">'+esc(label)+'</span>'+
+        '<span class="step-deadline muted">'+(m.deadline||'—')+'</span>'+
+        '<span class="badge"><i class="dot" style="background:'+roleColor(badge.role)+'"></i>'+badge.text+'</span>'+
+        '</div>';
+    }).join('');
+    list.querySelectorAll('[data-toggle-id]').forEach(function(chk){
+      chk.addEventListener('click', function(e){
+        e.stopPropagation();
+        toggleStepComplete(chk.getAttribute('data-toggle-id'));
+      });
+    });
+    list.querySelectorAll('.step-row').forEach(function(row){
+      row.addEventListener('click', function(){
+        var stepId = row.getAttribute('data-step-id');
+        if(stepId !== t.id) openTaskModal(stepId);
+      });
+    });
+    bindTooltips(list);
+  }
+
+  /** Toggle a step between done/not-done directly from the steps list, without closing the modal. */
+  function toggleStepComplete(id){
+    var t = state.tasks.find(function(x){return x.id===id;});
+    if(!t) return;
+    var nowDone = t.status==='Submitted' || t.status==='Approved';
+    var data = nowDone ? {status:'In Progress', submitTime:''} : {status:'Submitted', submitTime:new Date().toISOString()};
+
+    function refreshOpenModal(){
+      if(state.editingId){
+        var cur = state.tasks.find(function(x){return x.id===state.editingId;});
+        if(cur) renderStepsSection(cur);
+      }
+    }
+    if(SAMPLE){
+      Object.assign(t, data, {updatedAt:new Date().toISOString()});
+      renderAll();
+      refreshOpenModal();
+      showToast('Updated (sample mode).');
+      return;
+    }
+    apiCall('updateTask', {id:id, data:data}).then(function(res){
+      if(!res || res.ok===false){ showToast('Update failed.'); return; }
+      fetchTasks().then(refreshOpenModal);
+    }).catch(function(){});
+  }
+
+  document.getElementById('btn-add-step').addEventListener('click', function(){
+    var cur = state.editingId ? state.tasks.find(function(x){return x.id===state.editingId;}) : null;
+    if(!cur) return;
+    var root = familyRootId(cur);
+    var rootTask = state.tasks.find(function(x){return x.id===root;}) || cur;
+    openTaskModal(null, {parentId: root, studentName: rootTask.studentName, taskName: rootTask.taskName});
+  });
+
+  document.getElementById('btn-mark-submitted').addEventListener('click', function(){
+    var now = new Date();
+    document.getElementById('f-submitTime').value = toLocalInput(now.toISOString());
+    if(document.getElementById('f-status2').value === 'Not Started' || document.getElementById('f-status2').value === 'In Progress'){
+      document.getElementById('f-status2').value = 'Submitted';
+    }
+  });
+
+  document.getElementById('btn-save-task').addEventListener('click', function(){
+    var studentName = document.getElementById('f-studentName').value.trim();
+    var taskName = document.getElementById('f-taskName').value.trim();
+    var deadline = document.getElementById('f-deadline').value;
+    if(!studentName || !taskName || !deadline){
+      showToast('Student name, task name, and deadline are required.');
+      return;
+    }
+    var submitLocal = document.getElementById('f-submitTime').value;
+    var data = {
+      studentName: studentName, taskName: taskName,
+      description: document.getElementById('f-description').value,
+      priority: document.getElementById('f-priority').value,
+      startDate: document.getElementById('f-startDate').value,
+      deadline: deadline,
+      submitTime: submitLocal ? new Date(submitLocal).toISOString() : '',
+      status: document.getElementById('f-status2').value,
+      notes: document.getElementById('f-notes').value,
+      week: weekKey(parseDate(deadline)),
+      month: deadline.slice(0,7),
+      parentId: document.getElementById('f-parentId').value || '',
+      stepName: document.getElementById('f-stepName').value.trim()
+    };
+    var isEdit = !!state.editingId;
+
+    if(SAMPLE){
+      var now = new Date().toISOString();
+      if(isEdit){
+        var existing = state.tasks.find(function(x){return x.id===state.editingId;});
+        Object.assign(existing, data, {updatedAt: now});
+      } else {
+        data.id = 'local-'+Date.now(); data.createdAt = now; data.updatedAt = now;
+        state.tasks.push(data);
+      }
+      renderAll(); closeTaskModal(); showToast('Saved (sample mode — connect Settings to persist for real).');
+      return;
+    }
+
+    var promise = isEdit ? apiCall('updateTask', {id: state.editingId, data:data}) : apiCall('addTask', {data:data});
+    promise.then(function(res){
+      if(!res || res.ok===false){ showToast('Save failed: ' + (res&&res.error||'unknown error')); return; }
+      closeTaskModal();
+      // Notification emails only ever fire on brand-new rows (addTask), never on
+      // edits, and only under the admin passphrase — a member-created task is
+      // assumed to be the student assigning it to themselves, so no email fires
+      // regardless of whether an address is on file (mentioning "no email on
+      // file" in that case would be misleading, so members just see "Saved.").
+      if(!isEdit && isAdmin()){
+        showToast(res.emailSent
+          ? 'Saved — emailed ' + studentName + '.'
+          : 'Saved. No email on file for ' + studentName + ' — add one in Team to notify them next time.');
+      } else {
+        showToast('Saved.');
+      }
+      fetchTasks();
+    }).catch(function(){});
+  });
+
+  document.getElementById('btn-delete-task').addEventListener('click', function(){
+    if(!state.editingId) return;
+    if(!confirm('Delete this task? This cannot be undone.')) return;
+
+    if(SAMPLE){
+      state.tasks = state.tasks.filter(function(x){return x.id!==state.editingId;});
+      renderAll(); closeTaskModal(); showToast('Deleted (sample mode).');
+      return;
+    }
+
+    apiCall('deleteTask', {id: state.editingId}).then(function(res){
+      if(!res || res.ok===false){ showToast('Delete failed.'); return; }
+      closeTaskModal(); showToast('Deleted.'); fetchTasks();
+    }).catch(function(){});
+  });
+
+  /* ---------- settings modal ---------- */
+  var settingsOverlay = document.getElementById('settings-overlay');
+  function openSettings(){
+    document.getElementById('f-apiUrl').value = CONFIG.API_URL || '';
+    document.getElementById('settings-status').textContent = CONFIG.API_URL ? 'Connected.' : 'Not connected — showing sample data.';
+    settingsOverlay.classList.add('show');
+  }
+  document.getElementById('btn-settings').addEventListener('click', openSettings);
+  document.getElementById('settings-close').addEventListener('click', function(){ settingsOverlay.classList.remove('show'); });
+  document.getElementById('settings-cancel').addEventListener('click', function(){ settingsOverlay.classList.remove('show'); });
+  settingsOverlay.addEventListener('click', function(e){ if(e.target===settingsOverlay) settingsOverlay.classList.remove('show'); });
+
+  document.getElementById('btn-test-connection').addEventListener('click', function(){
+    var url = document.getElementById('f-apiUrl').value.trim();
+    var statusEl = document.getElementById('settings-status');
+    if(!url){ statusEl.textContent = 'Enter a URL first.'; return; }
+    if(!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(url)){
+      statusEl.textContent = '⚠ That doesn\'t look like an Apps Script /exec URL — it should start with https://script.google.com/macros/s/ and end in /exec. Re-copy it from Deploy → Manage deployments.';
+      return;
+    }
+    statusEl.textContent = 'Testing…';
+    fetch(url).then(function(r){
+      return r.text().then(function(text){ return {status:r.status, text:text}; });
+    }).then(function(res){
+      var json = null;
+      try { json = JSON.parse(res.text); } catch(e){ /* not JSON */ }
+      if(json && json.ok){
+        statusEl.textContent = '✓ Connected — found '+(json.tasks||[]).length+' task(s).';
+      } else if(json && json.ok === false && isAuthError(json)){
+        statusEl.textContent = '✓ Reachable and passphrase-protected (that\'s expected here — this test doesn\'t send a passphrase). Save & connect, then unlock with your team passphrase on the dashboard.';
+      } else if(json && json.ok === false){
+        statusEl.textContent = '✕ Sheet returned an error: ' + json.error;
+      } else if(/accounts\.google\.com|<html/i.test(res.text)){
+        statusEl.textContent = '✕ Got a Google sign-in/HTML page instead of data (HTTP '+res.status+'). This almost always means the deployment\'s "Who has access" isn\'t actually set to "Anyone" — redeploy (Deploy → Manage deployments → edit → Anyone) or make sure you completed the permission-approval prompt during deploy.';
+      } else {
+        statusEl.textContent = '✕ Unexpected response (HTTP '+res.status+'). Paste the URL directly into a new browser tab — it should show plain JSON like {"ok":true,"tasks":[]}. If it doesn\'t, the deployment needs fixing.';
+      }
+    }).catch(function(err){
+      statusEl.textContent = '✕ Network/CORS error reaching that URL. If you opened this file directly from your computer (a file:// address in the browser bar), some browsers block this kind of request — host the page first (e.g. Netlify Drop) and test again from there. Otherwise, paste the URL into a new browser tab directly to confirm it returns JSON.';
+    });
+  });
+
+  document.getElementById('btn-save-settings').addEventListener('click', function(){
+    var url = document.getElementById('f-apiUrl').value.trim();
+    var urlChanged = url !== CONFIG.API_URL;
+    CONFIG.API_URL = url;
+    SAMPLE = !url;
+    var newParams = new URLSearchParams(location.search);
+    if(url) newParams.set('api', url); else newParams.delete('api');
+    history.replaceState(null, '', location.pathname + (newParams.toString() ? '?'+newParams.toString() : ''));
+    settingsOverlay.classList.remove('show');
+    if(urlChanged){
+      // A different sheet almost certainly means a different (or no)
+      // passphrase — drop whatever we had and start the gate flow fresh
+      // rather than carrying a stale key over.
+      CONFIG.KEY = '';
+      state.role = '';
+      updateRoleUI();
+    }
+    if(!url){
+      showToast('Disconnected — showing sample data.');
+      hideGate();
+      fetchTasks();
+    } else if(urlChanged){
+      showToast('Connected — enter the team passphrase to continue.');
+      boot();
+    } else {
+      showToast('Reconnecting…');
+      fetchTasks();
+    }
+  });
+
+  /* ---------- team / notifications modal ---------- */
+  var teamOverlay = document.getElementById('team-overlay');
+  /** Every name that's ever appeared on a task, plus every name already in the roster — so you can add an email for someone before they have a task, or notice who's still missing one. */
+  function teamNames(){
+    var seen = {}, out = [];
+    studentNames().forEach(function(n){ var k=normName(n); if(!seen[k]){seen[k]=1; out.push(n);} });
+    state.students.forEach(function(s){ var k=normName(s.name); if(!seen[k]){seen[k]=1; out.push(s.name);} });
+    return out.sort(function(a,b){ return a.localeCompare(b); });
+  }
+  function normName(s){ return String(s||'').trim().toLowerCase(); }
+  function studentEmail(name){
+    var k = normName(name);
+    var hit = state.students.find(function(s){ return normName(s.name)===k; });
+    return hit ? hit.email||'' : '';
+  }
+  /** Shown on the Weekly Review deck's "Our Team" slide (e.g. "Backend & Integrations"). Optional. */
+  function studentFocusArea(name){
+    var k = normName(name);
+    var hit = state.students.find(function(s){ return normName(s.name)===k; });
+    return hit ? hit.focusArea||'' : '';
+  }
+  /** This student's personal sign-in code (admin-only visibility — the server never sends
+   *  other students' passcodes to a member's own dashboard, see doGet in Code.gs). */
+  function studentPasscode(name){
+    var k = normName(name);
+    var hit = state.students.find(function(s){ return normName(s.name)===k; });
+    return hit ? hit.passcode||'' : '';
+  }
+  // Sample/demo mode has no real backend to protect, so it behaves as if
+  // admin (same spirit as tasks already being freely editable in sample mode).
+  function isAdmin(){ return SAMPLE || state.role === 'admin'; }
+  function renderTeamList(){
+    var names = teamNames();
+    var el = document.getElementById('team-list');
+    var admin = isAdmin();
+    if(!names.length){ el.innerHTML = '<div class="team-empty">No students yet — add one below, or add a task and come back.</div>'; return; }
+    el.innerHTML = names.map(function(name){
+      var email = studentEmail(name);
+      var focusArea = studentFocusArea(name);
+      var passcode = studentPasscode(name);
+      var emailField = admin
+        ? '<input type="email" class="team-email-input" value="'+esc(email)+'" placeholder="No email on file">'
+        : '<div class="team-row-name" style="font-weight:400;color:var(--text-secondary);">'+(email ? esc(email) : 'No email on file')+'</div>';
+      var focusField = admin
+        ? '<input type="text" class="team-focus-input" value="'+esc(focusArea)+'" placeholder="Focus area (e.g. Backend & Integrations)" style="margin-top:6px;">'
+        : (focusArea ? '<div class="team-row-name" style="font-weight:400;color:var(--text-secondary);margin-top:2px;">'+esc(focusArea)+'</div>' : '');
+      // Passcode is admin-only, full stop — it's what turns "member" into a specific person's
+      // private dashboard, so there's no read-only display of it for anyone else.
+      var passcodeField = admin
+        ? '<input type="text" class="team-passcode-input" value="'+esc(passcode)+'" placeholder="Personal passcode (blank = can\'t sign in)" style="margin-top:6px;">'
+        : '';
+      return '<div class="team-row" data-name="'+esc(name)+'">'+
+        '<span class="avatar-sm" style="background:'+studentColor(name)+'">'+initials(name)+'</span>'+
+        '<div class="team-row-main"><div class="team-row-name">'+esc(name)+'</div>'+
+        emailField+
+        focusField+
+        passcodeField+
+        (email ? '' : '<div class="team-row-hint"><i class="dot" style="background:var(--status-warning)"></i>Not notified — add an email</div>')+
+        '</div>'+
+        (admin ? '<div class="team-row-actions">'+
+          '<button class="btn" data-save-student="'+esc(name)+'">Save</button>'+
+          '<button class="btn btn-danger" data-delete-student="'+esc(name)+'">Remove</button>'+
+          '</div>' : '')+
+        '</div>';
+    }).join('');
+    if(!admin) return;
+    el.querySelectorAll('[data-save-student]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var row = btn.closest('.team-row');
+        var name = btn.getAttribute('data-save-student');
+        var email = row.querySelector('.team-email-input').value.trim();
+        var focusArea = row.querySelector('.team-focus-input').value.trim();
+        var passcode = row.querySelector('.team-passcode-input').value.trim();
+        saveStudent(name, email, focusArea, passcode);
+      });
+    });
+    el.querySelectorAll('[data-delete-student]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var name = btn.getAttribute('data-delete-student');
+        if(!confirm('Remove '+name+' from the team roster? Their tasks stay untouched — this only stops notification emails.')) return;
+        removeStudent(name);
+      });
+    });
+  }
+  function saveStudent(name, email, focusArea, passcode){
+    if(!name) return;
+    if(SAMPLE){
+      var existing = state.students.find(function(s){ return normName(s.name)===normName(name); });
+      if(existing){ existing.email = email; existing.focusArea = focusArea||''; existing.passcode = passcode||''; } else { state.students.push({name:name, email:email, focusArea:focusArea||'', passcode:passcode||''}); }
+      renderTeamList(); renderStudentDatalist();
+      showToast('Saved (sample mode — connect Settings to persist for real).');
+      return;
+    }
+    apiCall('upsertStudent', {data:{name:name, email:email, focusArea:focusArea||'', passcode:passcode||''}}).then(function(res){
+      if(!res || res.ok===false){ showToast('Save failed: ' + (res&&res.error||'unknown error')); return; }
+      showToast(email ? 'Saved — '+name+' will be notified on new tasks.' : 'Saved.');
+      fetchTasks().then(renderTeamList);
+    }).catch(function(){});
+  }
+  function removeStudent(name){
+    if(SAMPLE){
+      state.students = state.students.filter(function(s){ return normName(s.name)!==normName(name); });
+      renderTeamList(); renderStudentDatalist();
+      showToast('Removed (sample mode).');
+      return;
+    }
+    apiCall('deleteStudent', {name:name}).then(function(res){
+      if(!res || res.ok===false){ showToast('Remove failed.'); return; }
+      showToast('Removed.');
+      fetchTasks().then(renderTeamList);
+    }).catch(function(){});
+  }
+  function openTeamModal(){
+    var admin = isAdmin();
+    document.getElementById('team-add-row').style.display = admin ? '' : 'none';
+    document.getElementById('team-intro').textContent = admin
+      ? 'Add an email, focus area, and personal passcode for anyone here. An email gets them an automatic notification the moment a new task is assigned (under the admin passphrase); a passcode lets them sign in to their own personal dashboard instead of the team-wide one. Names must match what\'s typed on their tasks (not case-sensitive).'
+      : 'Roster is view-only here — the admin passphrase is needed to add or edit anyone\'s details.';
+    renderTeamList();
+    document.getElementById('team-new-name').value = '';
+    document.getElementById('team-new-email').value = '';
+    document.getElementById('team-new-focus').value = '';
+    document.getElementById('team-new-passcode').value = '';
+    teamOverlay.classList.add('show');
+  }
+  document.getElementById('btn-team').addEventListener('click', openTeamModal);
+  document.getElementById('team-close').addEventListener('click', function(){ teamOverlay.classList.remove('show'); });
+  document.getElementById('team-done').addEventListener('click', function(){ teamOverlay.classList.remove('show'); });
+  teamOverlay.addEventListener('click', function(e){ if(e.target===teamOverlay) teamOverlay.classList.remove('show'); });
+  document.getElementById('btn-team-add').addEventListener('click', function(){
+    var name = document.getElementById('team-new-name').value.trim();
+    var email = document.getElementById('team-new-email').value.trim();
+    var focusArea = document.getElementById('team-new-focus').value.trim();
+    var passcode = document.getElementById('team-new-passcode').value.trim();
+    if(!name){ showToast('Enter a student name first.'); return; }
+    saveStudent(name, email, focusArea, passcode);
+    document.getElementById('team-new-name').value = '';
+    document.getElementById('team-new-email').value = '';
+    document.getElementById('team-new-focus').value = '';
+    document.getElementById('team-new-passcode').value = '';
+  });
+
+  /* ---------- report modal ---------- */
+  var reportOverlay = document.getElementById('report-overlay');
+  var REPORT_STATUSES = ['Not Started','In Progress','Submitted','Approved','Blocked'];
+  var REPORT_PRIORITIES = ['Low','Medium','High'];
+
+  function renderChipRow(containerId, values){
+    var el = document.getElementById(containerId);
+    el.innerHTML = values.map(function(v){
+      return '<label class="chip-check"><input type="checkbox" value="'+esc(v)+'">'+esc(v)+'</label>';
+    }).join('');
+    el.querySelectorAll('.chip-check').forEach(function(chip){
+      var input = chip.querySelector('input');
+      input.addEventListener('change', function(){ chip.classList.toggle('checked', input.checked); });
+    });
+  }
+  function checkedChipValues(containerId){
+    var out = [];
+    document.querySelectorAll('#'+containerId+' input:checked').forEach(function(inp){ out.push(inp.value); });
+    return out;
+  }
+  function openReportModal(){
+    if(!CONFIG.API_URL){ showToast('Connect your Google Sheet first (⚙ Settings) to generate a report.'); return; }
+    ['rf-created-from','rf-created-to','rf-submitted-from','rf-submitted-to','rf-deadline-from','rf-deadline-to'].forEach(function(id){
+      document.getElementById(id).value = '';
+    });
+    renderChipRow('rf-students', studentNames());
+    renderChipRow('rf-status', REPORT_STATUSES);
+    renderChipRow('rf-priority', REPORT_PRIORITIES);
+    setReportStatus('', '');
+    reportOverlay.classList.add('show');
+  }
+  function closeReportModal(){ reportOverlay.classList.remove('show'); }
+  function setReportStatus(msg, kind){
+    var el = document.getElementById('report-status');
+    el.textContent = msg || '';
+    el.className = 'report-status' + (kind ? ' is-'+kind : '');
+  }
+  function collectReportFilters(){
+    return {
+      createdFrom: document.getElementById('rf-created-from').value,
+      createdTo: document.getElementById('rf-created-to').value,
+      submittedFrom: document.getElementById('rf-submitted-from').value,
+      submittedTo: document.getElementById('rf-submitted-to').value,
+      deadlineFrom: document.getElementById('rf-deadline-from').value,
+      deadlineTo: document.getElementById('rf-deadline-to').value,
+      students: checkedChipValues('rf-students'),
+      statuses: checkedChipValues('rf-status'),
+      priorities: checkedChipValues('rf-priority')
+    };
+  }
+  function base64ToBlob(base64, mime){
+    var byteChars = atob(base64);
+    var bytes = new Uint8Array(byteChars.length);
+    for(var i=0;i<byteChars.length;i++){ bytes[i] = byteChars.charCodeAt(i); }
+    return new Blob([bytes], {type: mime});
+  }
+  function downloadBlob(blob, filename){
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+  }
+  function generateReport(){
+    if(SAMPLE){ showToast('Connect your Google Sheet first (⚙ Settings) — reports are built server-side from the real data.'); return; }
+    var btn = document.getElementById('btn-generate-report');
+    btn.disabled = true;
+    setReportStatus('Building your report — this can take a few seconds…', 'busy');
+    apiCall('generateReport', {filters: collectReportFilters()}).then(function(res){
+      btn.disabled = false;
+      if(!res || res.ok===false){
+        setReportStatus((res && res.error) || 'Report generation failed.', 'error');
+        return;
+      }
+      downloadBlob(base64ToBlob(res.base64, res.mimeType), res.filename || 'coop-report.pptx');
+      setReportStatus('Downloaded '+(res.filename||'coop-report.pptx')+' — '+(res.taskCount!=null?res.taskCount:'')+' task(s) included.', 'ok');
+    }).catch(function(){
+      btn.disabled = false;
+      setReportStatus('Could not reach the sheet — check Settings and try again.', 'error');
+    });
+  }
+  document.getElementById('btn-report').addEventListener('click', openReportModal);
+  document.getElementById('report-close').addEventListener('click', closeReportModal);
+  document.getElementById('report-cancel').addEventListener('click', closeReportModal);
+  reportOverlay.addEventListener('click', function(e){ if(e.target===reportOverlay) closeReportModal(); });
+  document.getElementById('btn-generate-report').addEventListener('click', generateReport);
+
+  /* ---------- weekly review modal ---------- */
+  var wrOverlay = document.getElementById('wr-overlay');
+  function setWrStatus(msg, kind){
+    var el = document.getElementById('wr-status');
+    el.textContent = msg || '';
+    el.className = 'report-status' + (kind ? ' is-'+kind : '');
+  }
+  function openWrModal(){
+    if(!CONFIG.API_URL){ showToast('Connect your Google Sheet first (⚙ Settings) to build the Weekly Review.'); return; }
+    setWrStatus('', '');
+    wrOverlay.classList.add('show');
+  }
+  function closeWrModal(){ wrOverlay.classList.remove('show'); }
+  function generateWeeklyReview(){
+    if(SAMPLE){ showToast('Connect your Google Sheet first (⚙ Settings) — the Weekly Review is built server-side from the real data.'); return; }
+    var btn = document.getElementById('btn-generate-wr');
+    btn.disabled = true;
+    setWrStatus('Building the deck — this can take a few seconds…', 'busy');
+    apiCall('generateWeeklyReview', {}).then(function(res){
+      btn.disabled = false;
+      if(!res || res.ok===false){
+        setWrStatus((res && res.error) || 'Weekly Review generation failed.', 'error');
+        return;
+      }
+      downloadBlob(base64ToBlob(res.base64, res.mimeType), res.filename || 'weekly-review.pptx');
+      setWrStatus('Downloaded '+(res.filename||'weekly-review.pptx')+' — '+(res.studentCount!=null?res.studentCount+' team member(s), ':'')+(res.lastWeekTaskCount!=null?res.lastWeekTaskCount+' task(s) last week, ':'')+(res.upcomingTaskCount!=null?res.upcomingTaskCount+' due this week.':''), 'ok');
+    }).catch(function(){
+      btn.disabled = false;
+      setWrStatus('Could not reach the sheet — check Settings and try again.', 'error');
+    });
+  }
+  document.getElementById('btn-weekly-review').addEventListener('click', openWrModal);
+  document.getElementById('wr-close').addEventListener('click', closeWrModal);
+  document.getElementById('wr-cancel').addEventListener('click', closeWrModal);
+  wrOverlay.addEventListener('click', function(e){ if(e.target===wrOverlay) closeWrModal(); });
+  document.getElementById('btn-generate-wr').addEventListener('click', generateWeeklyReview);
+
+  /* ---------- toast ---------- */
+  var toastTimer;
+  function showToast(msg){
+    var el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function(){ el.classList.remove('show'); }, 3200);
+  }
+
+  /* ---------- init ---------- */
+  boot();
+})();
+</script>
+</body>
+</html>
