@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Competitions and Direct Incentive Team</title>
+<title>Co-op Team Tracker</title>
 <style>
   /* ---------- STC brand palette (#4f008c deep purple · #a54ee1 violet ·
      #ff375e rose · #ffffff white) applied as: deep purple = primary action
@@ -375,6 +375,10 @@
   .chip-check input{margin:0;accent-color:var(--series-1);}
   .chip-check:hover{border-color:var(--text-muted);}
   .chip-check.checked{border-color:var(--series-1);color:var(--text-primary);background:var(--surface-1);font-weight:600;}
+  .wr-manual-toggle{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:var(--text-secondary);
+    cursor:pointer;user-select:none;margin:2px 0 12px;line-height:1.4;}
+  .wr-manual-toggle input{margin:2px 0 0;accent-color:var(--series-1);flex:none;}
+  .wr-manual-fields{border-top:1px solid var(--border);padding-top:12px;margin-top:2px;}
   .report-status{min-height:14px;}
   .report-status.is-busy{color:var(--text-secondary);}
   .report-status.is-error{color:var(--status-critical);}
@@ -422,7 +426,7 @@
 
   <header class="top">
     <div>
-      <h1>Competitions and Direct Incentive Team</h1>
+      <h1>Co-op Team Tracker</h1>
       <p>Progress board — sign in with your personal passcode for your own dashboard, or the admin passphrase for the full team view.</p>
     </div>
     <div class="top-actions">
@@ -833,7 +837,21 @@
   <div class="modal" style="max-width:480px;">
     <button class="close-x" id="wr-close">✕</button>
     <h3>Weekly Review</h3>
-    <p class="meta-line" style="margin:-6px 0 14px;">Builds a PowerPoint meeting deck for the Sunday–Thursday work week: a team roster slide, a team-wide recap of last week (completed / on-time / not finished, with a status chart), one slide per team member listing their own last-week tasks, and a whole-team slide of what's due this week.</p>
+    <p class="meta-line" style="margin:-6px 0 14px;">Builds a PowerPoint meeting deck: a team roster slide, a team-wide recap of the previous week (completed / on-time / not finished, with a status chart), one slide per team member listing their own previous-week tasks, and a whole-team slide of what's due in the upcoming week.</p>
+
+    <label class="wr-manual-toggle"><input type="checkbox" id="wr-manual-check">Choose the previous/upcoming week dates manually — otherwise it uses the current Sunday–Thursday work week automatically.</label>
+
+    <div class="wr-manual-fields" id="wr-manual-fields" style="display:none;">
+      <div class="field">
+        <label>Previous week (last week's recap)</label>
+        <div class="range-row"><input type="date" id="wr-last-start"><span>–</span><input type="date" id="wr-last-end"></div>
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>Upcoming week (what's due)</label>
+        <div class="range-row"><input type="date" id="wr-this-start"><span>–</span><input type="date" id="wr-this-end"></div>
+      </div>
+    </div>
+
     <div class="report-status" id="wr-status"></div>
     <div class="modal-actions">
       <button class="btn" id="wr-cancel">Cancel</button>
@@ -2596,6 +2614,8 @@
 
   /* ---------- weekly review modal ---------- */
   var wrOverlay = document.getElementById('wr-overlay');
+  var wrManualCheck = document.getElementById('wr-manual-check');
+  var wrManualFields = document.getElementById('wr-manual-fields');
   function setWrStatus(msg, kind){
     var el = document.getElementById('wr-status');
     el.textContent = msg || '';
@@ -2607,12 +2627,34 @@
     wrOverlay.classList.add('show');
   }
   function closeWrModal(){ wrOverlay.classList.remove('show'); }
+  wrManualCheck.addEventListener('change', function(){
+    wrManualFields.style.display = wrManualCheck.checked ? '' : 'none';
+  });
+  /** Reads the four manual date fields when the "choose dates manually" box is
+   *  checked. Returns {bounds} on success, or {error} if the box is checked
+   *  but the fields aren't validly filled in — checked client-side first so a
+   *  typo doesn't cost a round trip, though Code.gs validates again either way. */
+  function readWrBounds(){
+    if(!wrManualCheck.checked) return {bounds: null};
+    var lastStart = document.getElementById('wr-last-start').value;
+    var lastEnd = document.getElementById('wr-last-end').value;
+    var thisStart = document.getElementById('wr-this-start').value;
+    var thisEnd = document.getElementById('wr-this-end').value;
+    if(!lastStart || !lastEnd || !thisStart || !thisEnd){
+      return {error: 'Fill in all four manual dates, or uncheck the box to use the automatic work week.'};
+    }
+    if(lastStart > lastEnd) return {error: 'Previous week: start date is after the end date.'};
+    if(thisStart > thisEnd) return {error: 'Upcoming week: start date is after the end date.'};
+    return {bounds: {lastStart:lastStart, lastEnd:lastEnd, thisStart:thisStart, thisEnd:thisEnd}};
+  }
   function generateWeeklyReview(){
     if(SAMPLE){ showToast('Connect your Google Sheet first (⚙ Settings) — the Weekly Review is built server-side from the real data.'); return; }
+    var wr = readWrBounds();
+    if(wr.error){ setWrStatus(wr.error, 'error'); return; }
     var btn = document.getElementById('btn-generate-wr');
     btn.disabled = true;
     setWrStatus('Building the deck — this can take a few seconds…', 'busy');
-    apiCall('generateWeeklyReview', {}).then(function(res){
+    apiCall('generateWeeklyReview', {bounds: wr.bounds}).then(function(res){
       btn.disabled = false;
       if(!res || res.ok===false){
         setWrStatus((res && res.error) || 'Weekly Review generation failed.', 'error');
