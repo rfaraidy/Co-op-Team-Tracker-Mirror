@@ -2486,7 +2486,12 @@
     }
     apiCall('updateTask', {id:id, data:data}).then(function(res){
       if(!res || res.ok===false){ showToast('Update failed.'); return; }
-      fetchTasks().then(refreshOpenModal);
+      // Apply the server's authoritative row locally instead of paying for a full
+      // reload (doGet) just to see the change we already know happened — this is
+      // what makes save/edit/delete feel instant instead of laggy.
+      Object.assign(t, res.row || data, {updatedAt: (res.row && res.row.updatedAt) || new Date().toISOString()});
+      renderAll();
+      refreshOpenModal();
     }).catch(function(){});
   }
 
@@ -2548,6 +2553,18 @@
     promise.then(function(res){
       if(!res || res.ok===false){ showToast('Save failed: ' + (res&&res.error||'unknown error')); return; }
       closeTaskModal();
+      // Apply the server's authoritative row straight to local state instead of
+      // doing a full reload (fetchTasks/doGet) just to see what we already know
+      // we just saved — this is what makes save/edit/delete feel instant.
+      if(isEdit){
+        var existing = state.tasks.find(function(x){return x.id===state.editingId;});
+        if(existing) Object.assign(existing, res.row || data);
+      } else if(res.row){
+        state.tasks.push(res.row);
+      } else if(res.id){
+        state.tasks.push(Object.assign({}, data, {id: res.id}));
+      }
+      renderAll();
       // Notification emails only ever fire on brand-new rows (addTask), never on
       // edits, and only under the admin passphrase — a member-created task is
       // assumed to be the student assigning it to themselves, so no email fires
@@ -2560,7 +2577,6 @@
       } else {
         showToast('Saved.');
       }
-      fetchTasks();
     }).catch(function(){});
   });
 
@@ -2574,9 +2590,11 @@
       return;
     }
 
-    apiCall('deleteTask', {id: state.editingId}).then(function(res){
+    var deletedId = state.editingId;
+    apiCall('deleteTask', {id: deletedId}).then(function(res){
       if(!res || res.ok===false){ showToast('Delete failed.'); return; }
-      closeTaskModal(); showToast('Deleted.'); fetchTasks();
+      state.tasks = state.tasks.filter(function(x){return x.id!==deletedId;});
+      closeTaskModal(); showToast('Deleted.'); renderAll();
     }).catch(function(){});
   });
 
@@ -3446,11 +3464,17 @@
     promise.then(function(res){
       if(!res || res.ok===false){ showToast('Save failed: ' + (res&&res.error||'unknown error')); return; }
       closeProjectModal();
-      fetchTasks().then(function(){
-        renderProjectsTab();
-        if(isEdit) renderProjectDetail();
-        else if(res.id) openProjectDetail(res.id);
-      });
+      // Apply the server's authoritative row locally instead of a full reload —
+      // this is what makes save/edit/delete feel instant instead of laggy.
+      if(isEdit){
+        var existing = projectById(state.editingProjectId);
+        if(existing) Object.assign(existing, res.row || data);
+      } else if(res.row){
+        state.projects.push(res.row);
+      }
+      renderProjectsTab();
+      if(isEdit) renderProjectDetail();
+      else if(res.id) openProjectDetail(res.id);
     }).catch(function(){ showToast('Could not reach the sheet — check Settings and try again.'); });
   });
   document.getElementById('btn-delete-project').addEventListener('click', function(){
@@ -3467,8 +3491,13 @@
     }
     apiCall('deleteProject', {id:id}).then(function(res){
       if(!res || res.ok===false){ showToast('Delete failed.'); return; }
+      // Server cascade-deletes sprints/steps under this project — mirror that
+      // locally rather than round-tripping to find out what we already know.
+      state.projects = state.projects.filter(function(x){ return x.id!==id; });
+      state.sprints = state.sprints.filter(function(x){ return x.projectId!==id; });
+      state.steps = state.steps.filter(function(x){ return x.projectId!==id; });
       switchView('projects');
-      fetchTasks().then(renderProjectsTab);
+      renderProjectsTab();
       showToast('Project deleted.');
     }).catch(function(){ showToast('Could not reach the sheet — check Settings and try again.'); });
   });
@@ -3512,7 +3541,13 @@
     promise.then(function(res){
       if(!res || res.ok===false){ showToast('Save failed: ' + (res&&res.error||'unknown error')); return; }
       closeSprintModal();
-      fetchTasks().then(function(){ renderProjectDetail(); renderProjectsTab(); });
+      if(isEdit){
+        var existing = sprintById(state.editingSprintId);
+        if(existing) Object.assign(existing, res.row || data);
+      } else if(res.row){
+        state.sprints.push(res.row);
+      }
+      renderProjectDetail(); renderProjectsTab();
     }).catch(function(){ showToast('Could not reach the sheet — check Settings and try again.'); });
   });
   document.getElementById('btn-delete-sprint').addEventListener('click', function(){
@@ -3529,7 +3564,10 @@
     apiCall('deleteSprint', {id:id}).then(function(res){
       if(!res || res.ok===false){ showToast('Delete failed.'); return; }
       closeSprintModal();
-      fetchTasks().then(function(){ renderProjectDetail(); renderProjectsTab(); });
+      // Server cascade-deletes this sprint's steps — mirror that locally.
+      state.sprints = state.sprints.filter(function(x){ return x.id!==id; });
+      state.steps = state.steps.filter(function(x){ return x.sprintId!==id; });
+      renderProjectDetail(); renderProjectsTab();
       showToast('Sprint deleted.');
     }).catch(function(){ showToast('Could not reach the sheet — check Settings and try again.'); });
   });
@@ -3578,7 +3616,13 @@
     promise.then(function(res){
       if(!res || res.ok===false){ showToast('Save failed: ' + (res&&res.error||'unknown error')); return; }
       closeStepModal();
-      fetchTasks().then(function(){ renderProjectDetail(); renderProjectsTab(); });
+      if(isEdit){
+        var existing = state.steps.find(function(x){return x.id===state.editingStepId;});
+        if(existing) Object.assign(existing, res.row || data);
+      } else if(res.row){
+        state.steps.push(res.row);
+      }
+      renderProjectDetail(); renderProjectsTab();
     }).catch(function(){ showToast('Could not reach the sheet — check Settings and try again.'); });
   });
   document.getElementById('btn-delete-step').addEventListener('click', function(){
@@ -3594,7 +3638,8 @@
     apiCall('deleteStep', {id:id}).then(function(res){
       if(!res || res.ok===false){ showToast('Delete failed.'); return; }
       closeStepModal();
-      fetchTasks().then(function(){ renderProjectDetail(); renderProjectsTab(); });
+      state.steps = state.steps.filter(function(x){ return x.id!==id; });
+      renderProjectDetail(); renderProjectsTab();
       showToast('Step deleted.');
     }).catch(function(){ showToast('Could not reach the sheet — check Settings and try again.'); });
   });
