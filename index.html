@@ -492,6 +492,32 @@
   .gantt-row.is-sprint.is-clickable{cursor:pointer;}
   .gantt-row.is-sprint.is-clickable:hover .gantt-track{background:var(--gridline);}
   .gantt-open-btn{align-self:center;margin-right:10px;white-space:nowrap;flex-shrink:0;}
+
+  /* Gantt toolbar (search / status filter / person filter / zoom) — shared by the
+     per-project Gantt and admin's combined timeline. */
+  .gantt-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-bottom:10px;}
+  .gantt-search{display:flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:20px;
+    padding:5px 12px;background:var(--surface-1);flex:1 1 160px;max-width:220px;color:var(--text-muted);}
+  .gantt-search input{border:none;outline:none;background:none;font-size:12.5px;width:100%;color:var(--text-primary);}
+  .gantt-toolbar-group{display:flex;flex-wrap:wrap;gap:5px;}
+  .gantt-filter-chip{font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);
+    background:var(--surface-1);cursor:pointer;color:var(--text-secondary);white-space:nowrap;}
+  .gantt-filter-chip:hover{border-color:var(--text-muted);}
+  .gantt-filter-chip.is-active{border-color:var(--series-1);color:var(--text-primary);font-weight:600;background:var(--page);}
+  .gantt-scale-group{display:flex;align-items:center;gap:2px;border:1px solid var(--border);border-radius:20px;
+    padding:2px;background:var(--surface-1);margin-left:auto;flex-shrink:0;}
+  .gantt-scale-btn{font-size:11px;padding:4px 10px;border-radius:16px;border:none;background:none;cursor:pointer;color:var(--text-secondary);}
+  .gantt-scale-btn:hover{color:var(--text-primary);}
+  .gantt-scale-btn.is-active{background:var(--series-1);color:#fff;font-weight:600;}
+  .gantt-autofit-btn{font-size:11px;padding:4px 10px;border-radius:16px;border:none;background:none;cursor:pointer;color:var(--text-secondary);white-space:nowrap;}
+  .gantt-autofit-btn:hover{color:var(--text-primary);}
+  .gantt-autofit-btn.is-active{background:var(--page);color:var(--text-primary);font-weight:600;box-shadow:inset 0 0 0 1px var(--series-1);}
+  .gantt-zoom-btn{width:22px;height:22px;border-radius:50%;border:none;background:none;cursor:pointer;
+    color:var(--text-secondary);font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .gantt-zoom-btn:hover{color:var(--text-primary);background:var(--page);}
+  @media (max-width:760px){
+    .gantt-scale-group{margin-left:0;}
+  }
   .gantt-header{display:flex;position:sticky;top:0;background:var(--surface-1);z-index:2;border-bottom:1px solid var(--border);}
   .gantt-header .gantt-label{background:var(--surface-1);}
   .gantt-ticks{position:relative;flex:1;min-height:30px;}
@@ -765,6 +791,7 @@
          this — their own doGet response only ever contains their own projects anyway. -->
     <div class="card-panel" id="admin-timeline-panel" style="display:none;margin-top:22px;">
       <div class="section-head" style="margin:0 0 12px;"><h2>All projects — combined timeline</h2></div>
+      <div id="admin-timeline-toolbar"></div>
       <div class="gantt-wrap" id="admin-timeline-gantt"></div>
       <div class="gantt-legend" id="admin-timeline-project-legend" style="margin-top:10px;"></div>
       <div class="gantt-legend" style="margin-top:4px;">
@@ -800,6 +827,7 @@
       <h2>Timeline</h2>
       <button class="btn btn-primary" id="btn-add-sprint">+ Add Sprint</button>
     </div>
+    <div id="pd-gantt-toolbar"></div>
     <div class="gantt-wrap" id="pd-gantt"></div>
     <div class="gantt-legend" id="pd-gantt-legend">
       <span><i style="background:var(--text-muted)"></i>Not Started</span>
@@ -1175,7 +1203,15 @@
     // belong to the per-project Gantt) so toggling one view never affects the other.
     // A sprint here starts collapsed (id absent) — expandedAdminSprints[id] === true is
     // the one that means "showing its steps."
-    collapsedAdminMembers: {}, expandedAdminSprints: {} };
+    collapsedAdminMembers: {}, expandedAdminSprints: {},
+    // Toolbar state for the two Gantt views (search / status filter / zoom) — kept
+    // separate per view so filtering the combined admin timeline never affects a
+    // member's own project view and vice versa. autoFit:true means "compute the
+    // day-width to fit the visible width" instead of using a fixed scale preset.
+    ganttUi: {
+      project: { search: '', status: {}, scale: 'weeks', zoom: 1, autoFit: true },
+      admin: { search: '', status: {}, person: {}, scale: 'weeks', zoom: 1, autoFit: true }
+    } };
   /** True when signed in with a personal (student) passcode rather than the admin passphrase
    *  or sample/demo mode — the dashboard is scoped to just this one person's data. */
   function isPersonal(){ return !SAMPLE && state.role === 'member'; }
@@ -3263,45 +3299,174 @@
    *  — used by both the single-project Gantt and the admin's combined timeline below so
    *  the two stay visually identical. */
   var GANTT_DAY_PX = 26, GANTT_LABEL_PX = 220;
-  function buildGanttScale_(dateList){
+  // Zoom presets for the "Weeks / Months / Quarters" toolbar switcher — each sets a base
+  // pixels-per-day AND how far apart the ruler ticks fall / how they're labeled. Auto Fit
+  // (the default) ignores these and instead computes a day-width that makes the whole date
+  // range fit the visible width with no horizontal scrolling — see resolveGanttDayPx_.
+  var GANTT_SCALES = {
+    weeks:    { dayPx: 26, tickDays: 7,  fmt: 'weeks' },
+    months:   { dayPx: 10, tickDays: 30, fmt: 'months' },
+    quarters: { dayPx: 4,  tickDays: 91, fmt: 'quarters' }
+  };
+  function fmtMonthShort(iso){ var d = parseDate(iso); return d ? d.toLocaleDateString(undefined,{month:'short',year:'numeric'}) : ''; }
+  function fmtQuarterShort(iso){ var d = parseDate(iso); if(!d) return ''; return 'Q'+(Math.floor(d.getMonth()/3)+1)+' '+d.getFullYear(); }
+  /** Just the date math (range start + how many days it spans) — split out from
+   *  buildGanttScale_ so Auto Fit can size itself against the real day count before any
+   *  pixel width is chosen (the day count doesn't depend on dayPx, only the pixel math does). */
+  function ganttDateRange_(dateList){
     var dates = dateList.length ? dateList : [todayISO()];
     var minD = dates.reduce(function(a,b){ return b<a?b:a; });
     var maxD = dates.reduce(function(a,b){ return b>a?b:a; });
     var rangeStart = addDaysIso(minD, -3);
     var totalDays = Math.max(7, daysBetweenIso(rangeStart, addDaysIso(maxD, 3)) + 1);
-    var totalPx = totalDays * GANTT_DAY_PX;
-    function offsetPx(iso){ return daysBetweenIso(rangeStart, iso) * GANTT_DAY_PX; }
-    var todayLine = '<div class="gantt-today" style="left:'+offsetPx(todayISO())+'px;" data-tip="Today"></div>';
-    var ticks = [];
-    for(var off=0; off<=totalDays; off+=7){
-      ticks.push('<div class="gantt-tick" style="left:'+(off*GANTT_DAY_PX)+'px;">'+fmtDateShort(addDaysIso(rangeStart, off))+'</div>');
-    }
-    return { totalPx: totalPx, offsetPx: offsetPx, todayLine: todayLine, ticksHtml: ticks.join('') };
+    return { rangeStart: rangeStart, totalDays: totalDays };
   }
-  function ganttStepBarHtml_(st, offsetPx){
+  /** Turns a view's toolbar zoom state into an actual day-width in pixels. Auto Fit measures
+   *  the Gantt wrap's own current width (it's constrained by its container regardless of how
+   *  wide its scrollable content is, so this is stable to read before laying out any bars)
+   *  and divides the date range into it; a named scale (weeks/months/quarters) instead uses
+   *  a fixed base width, further nudged by the manual +/− zoom multiplier. */
+  function resolveGanttDayPx_(dateRange, ui, wrapEl){
+    if(ui.autoFit){
+      var avail = Math.max(240, (wrapEl && wrapEl.clientWidth || 760) - GANTT_LABEL_PX - 4);
+      return Math.min(60, Math.max(2, avail / dateRange.totalDays));
+    }
+    var preset = GANTT_SCALES[ui.scale] || GANTT_SCALES.weeks;
+    return Math.min(60, Math.max(2, preset.dayPx * (ui.zoom || 1)));
+  }
+  /** Picks tick spacing/label format to match how zoomed in we currently are — under Auto
+   *  Fit there's no named scale to read this off of, so it's derived from the resulting
+   *  day-width instead (wide days -> weekly ticks, narrow -> monthly/quarterly). */
+  function resolveGanttGranularity_(ui, dayPx){
+    if(!ui.autoFit) return GANTT_SCALES[ui.scale] || GANTT_SCALES.weeks;
+    if(dayPx >= 14) return GANTT_SCALES.weeks;
+    if(dayPx >= 5) return GANTT_SCALES.months;
+    return GANTT_SCALES.quarters;
+  }
+  function buildGanttScale_(dateList, dayPx, granularity){
+    dayPx = dayPx || GANTT_DAY_PX;
+    granularity = granularity || GANTT_SCALES.weeks;
+    var range = ganttDateRange_(dateList);
+    var rangeStart = range.rangeStart, totalDays = range.totalDays;
+    var totalPx = totalDays * dayPx;
+    function offsetPx(iso){ return daysBetweenIso(rangeStart, iso) * dayPx; }
+    var todayLine = '<div class="gantt-today" style="left:'+offsetPx(todayISO())+'px;" data-tip="Today"></div>';
+    var tickFmt = granularity.fmt === 'quarters' ? fmtQuarterShort : granularity.fmt === 'months' ? fmtMonthShort : fmtDateShort;
+    var ticks = [];
+    for(var off=0; off<=totalDays; off+=granularity.tickDays){
+      ticks.push('<div class="gantt-tick" style="left:'+(off*dayPx)+'px;">'+tickFmt(addDaysIso(rangeStart, off))+'</div>');
+    }
+    return { totalPx: totalPx, offsetPx: offsetPx, todayLine: todayLine, ticksHtml: ticks.join(''), dayPx: dayPx };
+  }
+  function ganttStepBarHtml_(st, offsetPx, dayPx){
     var stStart = st.startDate, stEnd = st.endDate || st.startDate;
     if(!stStart || !stEnd) return '';
-    var left = offsetPx(stStart), w = Math.max(GANTT_DAY_PX, (daysBetweenIso(stStart,stEnd)+1)*GANTT_DAY_PX);
+    var left = offsetPx(stStart), w = Math.max(6, dayPx, (daysBetweenIso(stStart,stEnd)+1)*dayPx);
     var label = w > 56 ? '<span class="gantt-bar-label">'+esc(st.name)+'</span>' : '';
     var tip = esc(st.name)+' · '+esc(st.status||'Not Started')+(st.assignedStudent?' · '+esc(st.assignedStudent):'')+' · '+fmtDateShort(stStart)+' – '+fmtDateShort(stEnd);
     return '<div class="gantt-bar" data-edit-step="'+esc(st.id)+'" style="left:'+left+'px;width:'+w+'px;background:'+stepStatusColor(st.status)+';" data-tip="'+tip+'">'+label+'</div>';
   }
-  function ganttSprintBarHtml_(sp, offsetPx){
+  function ganttSprintBarHtml_(sp, offsetPx, dayPx){
     var spStart = sp.startDate, spEnd = sp.endDate || sp.startDate;
     if(!spStart || !spEnd) return '';
-    return '<div class="gantt-bar is-sprint-bar" style="left:'+offsetPx(spStart)+'px;width:'+Math.max(GANTT_DAY_PX,(daysBetweenIso(spStart,spEnd)+1)*GANTT_DAY_PX)+'px;" '+
+    return '<div class="gantt-bar is-sprint-bar" style="left:'+offsetPx(spStart)+'px;width:'+Math.max(6, dayPx,(daysBetweenIso(spStart,spEnd)+1)*dayPx)+'px;" '+
       'data-tip="'+esc(sp.name)+': '+fmtDateShort(spStart)+' – '+fmtDateShort(spEnd)+'"></div>';
   }
   /** Solid, rounded "pill" sprint bar (colored by project) with a small handle dot at its
    *  end — used only by the admin's combined timeline (renderAdminTimeline), which colors
    *  by project instead of the dashed outline style the per-project Gantt uses. */
-  function ganttMemberPillHtml_(sp, offsetPx, color){
+  function ganttMemberPillHtml_(sp, offsetPx, dayPx, color){
     var spStart = sp.startDate, spEnd = sp.endDate || sp.startDate;
     if(!spStart || !spEnd) return '';
-    var left = offsetPx(spStart), w = Math.max(GANTT_DAY_PX, (daysBetweenIso(spStart,spEnd)+1)*GANTT_DAY_PX);
+    var left = offsetPx(spStart), w = Math.max(6, dayPx, (daysBetweenIso(spStart,spEnd)+1)*dayPx);
     var label = w > 56 ? '<span class="gantt-bar-label">'+esc(sp.name)+'</span>' : '';
     return '<div class="gantt-bar is-pill" style="left:'+left+'px;width:'+w+'px;background:'+color+';" '+
       'data-tip="'+esc(sp.name)+': '+fmtDateShort(spStart)+' – '+fmtDateShort(spEnd)+'">'+label+'<span class="gantt-bar-handle"></span></div>';
+  }
+  /** True if `text` contains `q`, case-insensitive — the shared match rule for every Gantt
+   *  toolbar's search box. */
+  function ganttMatch_(text, q){ return !q || String(text||'').toLowerCase().indexOf(q) > -1; }
+  /** Renders the search/status(/person)/zoom toolbar shared by renderGantt and
+   *  renderAdminTimeline. `personOptions` is an array of names to render as a person-filter
+   *  chip row — omit it (per-project view) to leave that group out entirely, since a single
+   *  project has one shared set of viewers, not a "which person" axis to filter by. */
+  function ganttToolbarHtml_(ui, personOptions){
+    var statusChips = Object.keys(STEP_STATUS_COLORS).map(function(s){
+      var active = !!ui.status[s];
+      return '<button type="button" class="gantt-filter-chip'+(active?' is-active':'')+'" data-gtb-status="'+esc(s)+'">'+esc(s)+'</button>';
+    }).join('');
+    var personChips = personOptions ? personOptions.map(function(name){
+      var active = !!ui.person[name];
+      return '<button type="button" class="gantt-filter-chip'+(active?' is-active':'')+'" data-gtb-person="'+esc(name)+'">'+esc(name)+'</button>';
+    }).join('') : '';
+    var scaleBtns = ['weeks','months','quarters'].map(function(s){
+      var active = !ui.autoFit && ui.scale === s;
+      return '<button type="button" class="gantt-scale-btn'+(active?' is-active':'')+'" data-gtb-scale="'+s+'">'+s.charAt(0).toUpperCase()+s.slice(1)+'</button>';
+    }).join('');
+    return '<div class="gantt-toolbar">'+
+      '<div class="gantt-search"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.6" y2="16.6"></line></svg>'+
+      '<input type="text" placeholder="Search" data-gtb-search value="'+esc(ui.search||'')+'" aria-label="Search projects, sprints, and steps"></div>'+
+      '<div class="gantt-toolbar-group" data-tip="Filter by status">'+statusChips+'</div>'+
+      (personOptions && personOptions.length ? '<div class="gantt-toolbar-group" data-tip="Filter by person">'+personChips+'</div>' : '')+
+      '<div class="gantt-scale-group">'+
+        '<button type="button" class="gantt-zoom-btn" data-gtb-zoom="out" data-tip="Zoom out" aria-label="Zoom out">−</button>'+
+        scaleBtns+
+        '<button type="button" class="gantt-autofit-btn'+(ui.autoFit?' is-active':'')+'" data-gtb-autofit data-tip="Fit the whole timeline to the screen">Auto Fit</button>'+
+        '<button type="button" class="gantt-zoom-btn" data-gtb-zoom="in" data-tip="Zoom in" aria-label="Zoom in">+</button>'+
+      '</div>'+
+    '</div>';
+  }
+  /** Wires up the toolbar rendered by ganttToolbarHtml_ above. `onChange` is the view's own
+   *  render function (renderGantt(projectId) or renderAdminTimeline) — every control just
+   *  mutates the shared `ui` state object in place and re-renders from scratch, same pattern
+   *  as the rest of this app. The search input is the one control that needs special care:
+   *  a full re-render on every keystroke replaces the DOM node, which would normally drop
+   *  focus after one character, so a re-render triggered by typing re-focuses the new input
+   *  and restores the cursor to the end. */
+  function bindGanttToolbar_(wrap, ui, onChange){
+    wrap.querySelectorAll('[data-gtb-status]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var v = btn.getAttribute('data-gtb-status');
+        if(ui.status[v]) delete ui.status[v]; else ui.status[v] = true;
+        onChange();
+      });
+    });
+    wrap.querySelectorAll('[data-gtb-person]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var v = btn.getAttribute('data-gtb-person');
+        if(ui.person[v]) delete ui.person[v]; else ui.person[v] = true;
+        onChange();
+      });
+    });
+    wrap.querySelectorAll('[data-gtb-scale]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        ui.scale = btn.getAttribute('data-gtb-scale'); ui.autoFit = false; ui.zoom = 1;
+        onChange();
+      });
+    });
+    var autoFitBtn = wrap.querySelector('[data-gtb-autofit]');
+    if(autoFitBtn) autoFitBtn.addEventListener('click', function(){ ui.autoFit = true; ui.zoom = 1; onChange(); });
+    wrap.querySelectorAll('[data-gtb-zoom]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        ui.autoFit = false;
+        var dir = btn.getAttribute('data-gtb-zoom');
+        ui.zoom = Math.min(3, Math.max(0.4, (ui.zoom || 1) * (dir === 'in' ? 1.25 : 0.8)));
+        onChange();
+      });
+    });
+    var searchInput = wrap.querySelector('[data-gtb-search]');
+    if(searchInput){
+      searchInput.addEventListener('input', function(){
+        ui.search = searchInput.value;
+        ui.__focusSearch = true;
+        onChange();
+      });
+    }
+    if(ui.__focusSearch){
+      ui.__focusSearch = false;
+      var freshSearch = wrap.querySelector('[data-gtb-search]');
+      if(freshSearch){ freshSearch.focus(); var pos = freshSearch.value.length; freshSearch.setSelectionRange(pos, pos); }
+    }
   }
 
   /** Renders one project's Gantt: one dashed outline bar per sprint (spanning its own
@@ -3311,14 +3476,22 @@
    *  server enforces the real permission check again regardless. Sprints are collapsible
    *  (state.collapsedSprints) so a sprint with many steps can be folded out of the way. */
   function renderGantt(projectId){
-    var sprints = sprintsForProject(projectId);
+    var allSprints = sprintsForProject(projectId);
     var wrap = document.getElementById('pd-gantt');
-    if(!sprints.length){
+    var toolbarEl = document.getElementById('pd-gantt-toolbar');
+    var ui = state.ganttUi.project;
+    if(!allSprints.length){
+      toolbarEl.innerHTML = '';
       wrap.innerHTML = '<div class="project-empty">No sprints yet — click "+ Add Sprint" above to start the timeline.</div>';
       return;
     }
+    toolbarEl.innerHTML = ganttToolbarHtml_(ui, null);
+
+    var q = (ui.search || '').trim().toLowerCase();
+    var statusActive = Object.keys(ui.status).length > 0;
+
     var dates = [todayISO()];
-    sprints.forEach(function(sp){
+    allSprints.forEach(function(sp){
       if(sp.startDate) dates.push(sp.startDate);
       if(sp.endDate) dates.push(sp.endDate);
       stepsForSprint(sp.id).forEach(function(st){
@@ -3326,34 +3499,49 @@
         if(st.endDate) dates.push(st.endDate);
       });
     });
-    var scale = buildGanttScale_(dates);
+    var dateRange = ganttDateRange_(dates);
+    var dayPx = resolveGanttDayPx_(dateRange, ui, wrap);
+    var granularity = resolveGanttGranularity_(ui, dayPx);
+    var scale = buildGanttScale_(dates, dayPx, granularity);
     var offsetPx = scale.offsetPx, totalPx = scale.totalPx, todayLine = scale.todayLine;
 
     var rowsHtml = [];
-    sprints.forEach(function(sp){
-      var collapsed = !!state.collapsedSprints[sp.id];
+    allSprints.forEach(function(sp){
       var steps = stepsForSprint(sp.id);
+      var sprintNameMatches = ganttMatch_(sp.name, q);
+      var matchingSteps = steps.filter(function(st){ return ganttMatch_(st.name, q); });
+      if(q && !sprintNameMatches && !matchingSteps.length) return; // no relevance to the search at all
+
+      var collapsed = !!state.collapsedSprints[sp.id];
+      var forceExpand = !!q && !sprintNameMatches && matchingSteps.length > 0;
+      var showSteps = !collapsed || forceExpand;
       rowsHtml.push('<div class="gantt-row is-sprint">'+
         '<div class="gantt-label is-sprint" data-edit-sprint="'+esc(sp.id)+'"><div class="sprint-group-head">'+
-        '<button class="gantt-caret" data-toggle-sprint="'+esc(sp.id)+'" data-tip="'+(collapsed?'Expand':'Collapse')+' this sprint" aria-label="'+(collapsed?'Expand':'Collapse')+' '+esc(sp.name)+'">'+(collapsed?'▸':'▾')+'</button>'+
-        '<span class="gantt-label-name" data-tip="'+esc(sp.name)+'">'+esc(sp.name)+(collapsed?' ('+steps.length+')':'')+'</span>'+
+        '<button class="gantt-caret" data-toggle-sprint="'+esc(sp.id)+'" data-tip="'+(showSteps?'Collapse':'Expand')+' this sprint" aria-label="'+(showSteps?'Collapse':'Expand')+' '+esc(sp.name)+'">'+(showSteps?'▾':'▸')+'</button>'+
+        '<span class="gantt-label-name" data-tip="'+esc(sp.name)+'">'+esc(sp.name)+(!showSteps?' ('+steps.length+')':'')+'</span>'+
         '<span class="sprint-group-actions"><button class="icon-btn" data-add-step="'+esc(sp.id)+'" data-tip="Add step to this sprint">+ step</button></span>'+
         '</div></div>'+
-        '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttSprintBarHtml_(sp, offsetPx)+todayLine+'</div>'+
+        '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttSprintBarHtml_(sp, offsetPx, dayPx)+todayLine+'</div>'+
         '</div>');
-      if(collapsed) return;
-      steps.forEach(function(st){
+      if(!showSteps) return;
+      steps.filter(function(st){
+        if(statusActive && !ui.status[st.status || 'Not Started']) return false;
+        if(q && !(sprintNameMatches || ganttMatch_(st.name, q))) return false;
+        return true;
+      }).forEach(function(st){
         rowsHtml.push('<div class="gantt-row is-step">'+
           '<div class="gantt-label is-step" data-edit-step="'+esc(st.id)+'"><span class="gantt-label-name" data-tip="'+esc(st.name)+'">'+esc(st.name)+'</span></div>'+
-          '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttStepBarHtml_(st, offsetPx)+todayLine+'</div>'+
+          '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttStepBarHtml_(st, offsetPx, dayPx)+todayLine+'</div>'+
           '</div>');
       });
     });
 
-    wrap.innerHTML =
+    wrap.innerHTML = rowsHtml.length ?
       '<div class="gantt-header"><div class="gantt-label"></div><div class="gantt-ticks" style="width:'+totalPx+'px;">'+scale.ticksHtml+todayLine+'</div></div>'+
-      '<div class="gantt-body">'+rowsHtml.join('')+'</div>';
+      '<div class="gantt-body">'+rowsHtml.join('')+'</div>'
+      : '<div class="project-empty">No sprints or steps match your search/filters.</div>';
     bindTooltips(wrap);
+    bindGanttToolbar_(toolbarEl, ui, function(){ renderGantt(projectId); });
     wrap.querySelectorAll('[data-toggle-sprint]').forEach(function(btn){
       btn.addEventListener('click', function(e){
         e.stopPropagation();
@@ -3383,8 +3571,11 @@
    *  goes through the small "↗" open button rather than an edit modal directly from here. */
   function renderAdminTimeline(){
     var wrap = document.getElementById('admin-timeline-gantt');
+    var toolbarEl = document.getElementById('admin-timeline-toolbar');
     var legendWrap = document.getElementById('admin-timeline-project-legend');
+    var ui = state.ganttUi.admin;
     if(!state.projects.length){
+      toolbarEl.innerHTML = '';
       wrap.innerHTML = '<div class="project-empty">No projects yet across the team.</div>';
       if(legendWrap) legendWrap.innerHTML = '';
       return;
@@ -3396,16 +3587,41 @@
       byOwner[owner].push(p);
     });
     ownerOrder.sort(function(a,b){ return a.localeCompare(b); });
+    toolbarEl.innerHTML = ganttToolbarHtml_(ui, ownerOrder);
+
+    var q = (ui.search || '').trim().toLowerCase();
+    var statusActive = Object.keys(ui.status).length > 0;
+    var personActive = Object.keys(ui.person).length > 0;
 
     var dates = [todayISO()];
     state.sprints.forEach(function(sp){ if(sp.startDate) dates.push(sp.startDate); if(sp.endDate) dates.push(sp.endDate); });
     state.steps.forEach(function(st){ if(st.startDate) dates.push(st.startDate); if(st.endDate) dates.push(st.endDate); });
-    var scale = buildGanttScale_(dates);
+    var dateRange = ganttDateRange_(dates);
+    var dayPx = resolveGanttDayPx_(dateRange, ui, wrap);
+    var granularity = resolveGanttGranularity_(ui, dayPx);
+    var scale = buildGanttScale_(dates, dayPx, granularity);
     var offsetPx = scale.offsetPx, totalPx = scale.totalPx, todayLine = scale.todayLine;
 
     var rowsHtml = [];
     ownerOrder.forEach(function(owner){
+      if(personActive && !ui.person[owner]) return;
       var projects = byOwner[owner];
+      var ownerMatches = ganttMatch_(owner, q);
+
+      // Figure out, before rendering, whether this member has anything relevant to the
+      // current search so an irrelevant member can be skipped entirely rather than shown
+      // with an empty "no sprints" row.
+      var relevantSprintCount = 0;
+      projects.forEach(function(p){
+        var projectMatches = ganttMatch_(p.name, q);
+        sprintsForProject(p.id).forEach(function(sp){
+          var sprintMatches = ganttMatch_(sp.name, q);
+          var stepMatches = stepsForSprint(sp.id).some(function(st){ return ganttMatch_(st.name, q); });
+          if(!q || ownerMatches || projectMatches || sprintMatches || stepMatches) relevantSprintCount++;
+        });
+      });
+      if(q && !ownerMatches && !relevantSprintCount) return;
+
       var mCollapsed = !!state.collapsedAdminMembers[owner];
       var sprintTotal = 0;
       projects.forEach(function(p){ sprintTotal += sprintsForProject(p.id).length; });
@@ -3422,31 +3638,44 @@
       var anySprint = false;
       var showProjectTag = projects.length > 1;
       projects.forEach(function(p){
+        var projectMatches = ganttMatch_(p.name, q);
         sprintsForProject(p.id).forEach(function(sp){
-          anySprint = true;
-          var expanded = !!state.expandedAdminSprints[sp.id];
+          var sprintMatches = ganttMatch_(sp.name, q);
           var steps = stepsForSprint(sp.id);
+          var matchingSteps = steps.filter(function(st){ return ganttMatch_(st.name, q); });
+          var relevant = !q || ownerMatches || projectMatches || sprintMatches || matchingSteps.length > 0;
+          if(!relevant) return;
+          anySprint = true;
+
+          var expanded = !!state.expandedAdminSprints[sp.id];
+          var forceExpand = !!q && !ownerMatches && !projectMatches && !sprintMatches && matchingSteps.length > 0;
+          var showSteps = expanded || forceExpand;
           rowsHtml.push('<div class="gantt-row is-sprint is-clickable" data-toggle-admin-sprint="'+esc(sp.id)+'">'+
             '<div class="gantt-label is-sprint is-nested"><div class="sprint-group-head">'+
-            '<span class="gantt-caret" aria-hidden="true" data-tip="'+(expanded?'Hide':'Show')+' this sprint\'s steps">'+(expanded?'▾':'▸')+'</span>'+
+            '<span class="gantt-caret" aria-hidden="true" data-tip="'+(showSteps?'Hide':'Show')+' this sprint\'s steps">'+(showSteps?'▾':'▸')+'</span>'+
             '<span class="project-dot" style="background:'+projectColor(p.id)+'"></span>'+
             '<span class="gantt-label-name" data-tip="'+esc(sp.name)+(showProjectTag?' · '+esc(p.name):'')+'">'+esc(sp.name)+(steps.length ? ' ('+steps.length+')' : '')+'</span>'+
             (showProjectTag ? '<span class="project-owner-tag">'+esc(p.name)+'</span>' : '')+
             '</div></div>'+
-            '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttMemberPillHtml_(sp, offsetPx, projectColor(p.id))+todayLine+'</div>'+
+            '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttMemberPillHtml_(sp, offsetPx, dayPx, projectColor(p.id))+todayLine+'</div>'+
             '<button class="icon-btn gantt-open-btn" data-open-project="'+esc(p.id)+'" data-tip="Open '+esc(p.name)+' to edit">Open ↗</button>'+
             '</div>');
-          if(!expanded) return;
-          if(!steps.length){
+          if(!showSteps) return;
+          var visibleSteps = steps.filter(function(st){
+            if(statusActive && !ui.status[st.status || 'Not Started']) return false;
+            if(q && !(ownerMatches || projectMatches || sprintMatches || ganttMatch_(st.name, q))) return false;
+            return true;
+          });
+          if(!visibleSteps.length){
             rowsHtml.push('<div class="gantt-row is-step"><div class="gantt-label is-step is-nested">'+
-              '<span class="gantt-label-name" style="font-style:italic;color:var(--text-muted);">No steps yet</span></div>'+
+              '<span class="gantt-label-name" style="font-style:italic;color:var(--text-muted);">'+(steps.length?'No steps match':'No steps yet')+'</span></div>'+
               '<div class="gantt-track" style="width:'+totalPx+'px;">'+todayLine+'</div></div>');
             return;
           }
-          steps.forEach(function(st){
+          visibleSteps.forEach(function(st){
             rowsHtml.push('<div class="gantt-row is-step">'+
               '<div class="gantt-label is-step is-nested" data-open-project="'+esc(p.id)+'"><span class="gantt-label-name" data-tip="Open '+esc(p.name)+'">'+esc(st.name)+'</span></div>'+
-              '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttStepBarHtml_(st, offsetPx)+todayLine+'</div>'+
+              '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttStepBarHtml_(st, offsetPx, dayPx)+todayLine+'</div>'+
               '</div>');
           });
         });
@@ -3458,9 +3687,10 @@
       }
     });
 
-    wrap.innerHTML =
+    wrap.innerHTML = rowsHtml.length ?
       '<div class="gantt-header"><div class="gantt-label"></div><div class="gantt-ticks" style="width:'+totalPx+'px;">'+scale.ticksHtml+todayLine+'</div></div>'+
-      '<div class="gantt-body">'+rowsHtml.join('')+'</div>';
+      '<div class="gantt-body">'+rowsHtml.join('')+'</div>'
+      : '<div class="project-empty">Nothing matches your search/filters.</div>';
     bindTooltips(wrap);
 
     if(legendWrap){
@@ -3469,6 +3699,7 @@
       }).join('');
     }
 
+    bindGanttToolbar_(toolbarEl, ui, renderAdminTimeline);
     wrap.querySelectorAll('[data-toggle-member]').forEach(function(el){
       el.addEventListener('click', function(){
         var owner = el.getAttribute('data-toggle-member');
