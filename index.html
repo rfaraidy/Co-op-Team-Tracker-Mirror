@@ -457,6 +457,8 @@
   .project-card-stats b{color:var(--text-primary);font-weight:700;}
   .project-card-actions{display:flex;gap:6px;margin-top:12px;}
   .project-empty{padding:28px 10px;text-align:center;color:var(--text-muted);font-size:13px;}
+  .project-owner-tag{flex-shrink:0;font-size:10.5px;font-weight:600;color:var(--text-muted);
+    background:var(--page);border-radius:20px;padding:2px 9px;white-space:nowrap;}
 
   /* Gantt timeline (project detail) */
   .gantt-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-1);}
@@ -466,9 +468,15 @@
     background:var(--surface-1);border-right:1px solid var(--border);display:flex;align-items:center;gap:6px;z-index:1;}
   .gantt-label.is-sprint{font-weight:700;color:var(--text-primary);background:var(--page);}
   .gantt-label.is-step{color:var(--text-secondary);padding-left:22px;}
+  .gantt-label.is-project{font-weight:700;color:var(--text-primary);background:var(--surface-1);cursor:pointer;}
+  .gantt-label.is-project:hover{background:var(--page);}
+  .gantt-label.is-nested{padding-left:22px;cursor:pointer;}
+  .gantt-label.is-nested:hover{background:var(--page);}
+  .gantt-label.is-step.is-nested{padding-left:38px;}
   .gantt-label-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .gantt-track{position:relative;flex:1;min-height:34px;}
   .gantt-row.is-sprint .gantt-track{background:var(--page);}
+  .gantt-row.is-project .gantt-track{background:var(--surface-1);}
   .gantt-bar{position:absolute;top:7px;height:20px;border-radius:4px;cursor:pointer;
     display:flex;align-items:center;overflow:hidden;transition:filter .1s;}
   .gantt-bar:hover{filter:brightness(1.08);}
@@ -485,10 +493,13 @@
   .gantt-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--text-secondary);margin-top:12px;}
   .gantt-legend span{display:inline-flex;align-items:center;gap:6px;}
   .gantt-legend i{width:10px;height:10px;border-radius:3px;display:inline-block;}
-  .sprint-group-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .sprint-group-head{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;}
   .sprint-group-actions{display:flex;gap:4px;flex-shrink:0;}
   .icon-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px 4px;font-size:12px;line-height:1;border-radius:4px;}
   .icon-btn:hover{color:var(--text-primary);background:var(--gridline);}
+  .gantt-caret{background:none;border:none;color:var(--text-muted);cursor:pointer;padding:0;width:14px;flex-shrink:0;
+    font-size:10px;line-height:1;text-align:center;}
+  .gantt-caret:hover{color:var(--text-primary);}
   @media (max-width:760px){
     .project-grid{grid-template-columns:1fr 1fr;}
     .gantt-label{width:150px;}
@@ -713,7 +724,7 @@
   <section class="view" id="view-projects">
     <div class="section-head">
       <h2>Projects</h2>
-      <button class="btn btn-primary" id="btn-add-project" style="display:none;">+ Add Project</button>
+      <button class="btn btn-primary" id="btn-add-project">+ Add Project</button>
     </div>
 
     <div class="section-head" style="margin-top:4px;">
@@ -737,6 +748,22 @@
       <div class="donut-row">
         <div class="donut-wrap" id="proj-pie"></div>
         <div class="donut-legend" id="proj-pie-legend"></div>
+      </div>
+    </div>
+
+    <!-- Admin-only: a combined Project -> Sprint -> Step timeline across every member's
+         projects, toggled on/off in renderProjectsTab() by isAdmin(). Members never see
+         this — their own doGet response only ever contains their own projects anyway. -->
+    <div class="card-panel" id="admin-timeline-panel" style="display:none;margin-top:22px;">
+      <div class="section-head" style="margin:0 0 12px;"><h2>All projects — combined timeline</h2></div>
+      <div class="gantt-wrap" id="admin-timeline-gantt"></div>
+      <div class="gantt-legend" style="margin-top:10px;">
+        <span><i class="dot" style="background:var(--text-muted);"></i>Not Started</span>
+        <span><i class="dot" style="background:var(--status-info);"></i>In Progress</span>
+        <span><i class="dot" style="background:var(--series-1);"></i>Submitted</span>
+        <span><i class="dot" style="background:var(--status-good);"></i>Approved</span>
+        <span><i class="dot" style="background:var(--status-critical);"></i>Blocked</span>
+        <span>&nbsp;·&nbsp;click a row to open that project</span>
       </div>
     </div>
 
@@ -1131,7 +1158,8 @@
   var state = { tasks: [], students: [], role: '', myName: '', selectedWeek: weekKey(new Date()), selectedMonth: todayMonth(), editingId: null, view: 'overview',
     detailStudent: null, studentDetailFrom: 'overview',
     projects: [], sprints: [], steps: [], detailProject: null, projectsCalMonth: todayMonth(),
-    editingProjectId: null, editingSprintId: null, editingStepId: null, stepSprintContext: null };
+    editingProjectId: null, editingSprintId: null, editingStepId: null, stepSprintContext: null,
+    collapsedSprints: {}, collapsedProjects: {} };
   /** True when signed in with a personal (student) passcode rather than the admin passphrase
    *  or sample/demo mode — the dashboard is scoped to just this one person's data. */
   function isPersonal(){ return !SAMPLE && state.role === 'member'; }
@@ -3023,24 +3051,38 @@
   function fmtDateShort(iso){ var d = parseDate(iso); return d ? d.toLocaleDateString(undefined,{month:'short',day:'numeric'}) : ''; }
 
   /* ---------- Projects tab: project cards + steps-by-project pie + all-steps calendar ---------- */
+  // Ownership model: any signed-in user (admin or member) can add a project of their own.
+  // A member's own doGet response is already scoped server-side to just their own projects
+  // (and that project's sprints/steps) — see readOwnProjectsData_ in Code.gs — so nothing
+  // in state.projects ever belongs to someone else when signed in as a member. Admin's
+  // response is unfiltered (every project, every owner), which is what powers the
+  // admin-only combined timeline below. Because visibility already implies "this is either
+  // mine or I'm admin," none of the add/edit/delete controls need their own admin-only gate
+  // anymore — the "+ Add Project" button and every per-project action are always shown.
   function renderProjectsTab(){
-    document.getElementById('btn-add-project').style.display = isAdmin() ? '' : 'none';
     renderProjectCards();
     renderProjectsPie();
     renderProjectsCalendar();
+    document.getElementById('admin-timeline-panel').style.display = isAdmin() ? '' : 'none';
+    if(isAdmin()) renderAdminTimeline();
   }
   function renderProjectCards(){
     var el = document.getElementById('project-grid');
     if(!state.projects.length){
-      el.innerHTML = '<div class="project-empty">No projects yet'+(isAdmin() ? ' — click "+ Add Project" above to create one.' : '.')+'</div>';
+      el.innerHTML = '<div class="project-empty">No projects yet — click "+ Add Project" above to create one.</div>';
       return;
     }
+    // Admin sees every member's projects mixed together, so a small owner tag helps tell
+    // them apart; a member only ever has their own, so the tag would be redundant there.
+    var showOwner = isAdmin();
     el.innerHTML = state.projects.map(function(p){
       var steps = stepsForProject(p.id), sprints = sprintsForProject(p.id);
       var done = steps.filter(function(s){ return s.status==='Submitted'||s.status==='Approved'; }).length;
       return '<div class="project-card" data-id="'+esc(p.id)+'" tabindex="0" role="button" aria-label="Open '+esc(p.name)+'">'+
         '<div class="project-card-top"><span class="project-dot" style="background:'+projectColor(p.id)+'"></span>'+
-        '<span class="project-card-name">'+esc(p.name)+'</span></div>'+
+        '<span class="project-card-name">'+esc(p.name)+'</span>'+
+        (showOwner && p.ownerName ? '<span class="project-owner-tag">'+esc(p.ownerName)+'</span>' : '')+
+        '</div>'+
         '<div class="project-card-desc">'+esc(p.description||'No description yet.')+'</div>'+
         '<div class="project-card-stats"><span><b>'+sprints.length+'</b> sprint'+(sprints.length===1?'':'s')+'</span>'+
         '<span><b>'+steps.length+'</b> step'+(steps.length===1?'':'s')+'</span>'+
@@ -3173,23 +3215,56 @@
     document.getElementById('pd-name').textContent = p.name;
     document.getElementById('pd-desc').textContent = p.description || '';
     document.getElementById('pd-notes').textContent = p.notes || 'No notes.';
-    var admin = isAdmin();
-    document.getElementById('pd-actions').style.display = admin ? '' : 'none';
-    document.getElementById('btn-add-sprint').style.display = admin ? '' : 'none';
     renderGantt(id);
   }
 
-  /** Renders the project's Gantt: one dashed outline bar per sprint (spanning its own
-   *  start–end) with its steps as colored sub-rows underneath, all sharing one date axis
-   *  (week tick marks + a dashed "today" line) computed from the earliest/latest date
-   *  across every sprint and step in the project, padded a few days on each side. */
+  /** Shared date-axis math for any Gantt-style view: given a list of ISO date strings
+   *  (already including today, if the caller wants it in range), returns the padded
+   *  visible range, per-day pixel offset function, week tick marks, and a "today" marker
+   *  — used by both the single-project Gantt and the admin's combined timeline below so
+   *  the two stay visually identical. */
   var GANTT_DAY_PX = 26, GANTT_LABEL_PX = 220;
+  function buildGanttScale_(dateList){
+    var dates = dateList.length ? dateList : [todayISO()];
+    var minD = dates.reduce(function(a,b){ return b<a?b:a; });
+    var maxD = dates.reduce(function(a,b){ return b>a?b:a; });
+    var rangeStart = addDaysIso(minD, -3);
+    var totalDays = Math.max(7, daysBetweenIso(rangeStart, addDaysIso(maxD, 3)) + 1);
+    var totalPx = totalDays * GANTT_DAY_PX;
+    function offsetPx(iso){ return daysBetweenIso(rangeStart, iso) * GANTT_DAY_PX; }
+    var todayLine = '<div class="gantt-today" style="left:'+offsetPx(todayISO())+'px;" data-tip="Today"></div>';
+    var ticks = [];
+    for(var off=0; off<=totalDays; off+=7){
+      ticks.push('<div class="gantt-tick" style="left:'+(off*GANTT_DAY_PX)+'px;">'+fmtDateShort(addDaysIso(rangeStart, off))+'</div>');
+    }
+    return { totalPx: totalPx, offsetPx: offsetPx, todayLine: todayLine, ticksHtml: ticks.join('') };
+  }
+  function ganttStepBarHtml_(st, offsetPx){
+    var stStart = st.startDate, stEnd = st.endDate || st.startDate;
+    if(!stStart || !stEnd) return '';
+    var left = offsetPx(stStart), w = Math.max(GANTT_DAY_PX, (daysBetweenIso(stStart,stEnd)+1)*GANTT_DAY_PX);
+    var label = w > 56 ? '<span class="gantt-bar-label">'+esc(st.name)+'</span>' : '';
+    var tip = esc(st.name)+' · '+esc(st.status||'Not Started')+(st.assignedStudent?' · '+esc(st.assignedStudent):'')+' · '+fmtDateShort(stStart)+' – '+fmtDateShort(stEnd);
+    return '<div class="gantt-bar" data-edit-step="'+esc(st.id)+'" style="left:'+left+'px;width:'+w+'px;background:'+stepStatusColor(st.status)+';" data-tip="'+tip+'">'+label+'</div>';
+  }
+  function ganttSprintBarHtml_(sp, offsetPx){
+    var spStart = sp.startDate, spEnd = sp.endDate || sp.startDate;
+    if(!spStart || !spEnd) return '';
+    return '<div class="gantt-bar is-sprint-bar" style="left:'+offsetPx(spStart)+'px;width:'+Math.max(GANTT_DAY_PX,(daysBetweenIso(spStart,spEnd)+1)*GANTT_DAY_PX)+'px;" '+
+      'data-tip="'+esc(sp.name)+': '+fmtDateShort(spStart)+' – '+fmtDateShort(spEnd)+'"></div>';
+  }
+
+  /** Renders one project's Gantt: one dashed outline bar per sprint (spanning its own
+   *  start–end) with its steps as colored sub-rows underneath, all sharing one date axis.
+   *  Any signed-in user who can reach this view already owns the project (or is admin —
+   *  see readOwnProjectsData_ in Code.gs), so every control here is always shown; the
+   *  server enforces the real permission check again regardless. Sprints are collapsible
+   *  (state.collapsedSprints) so a sprint with many steps can be folded out of the way. */
   function renderGantt(projectId){
     var sprints = sprintsForProject(projectId);
     var wrap = document.getElementById('pd-gantt');
-    var admin = isAdmin();
     if(!sprints.length){
-      wrap.innerHTML = '<div class="project-empty">No sprints yet'+(admin ? ' — click "+ Add Sprint" above to start the timeline.' : '.')+'</div>';
+      wrap.innerHTML = '<div class="project-empty">No sprints yet — click "+ Add Sprint" above to start the timeline.</div>';
       return;
     }
     var dates = [todayISO()];
@@ -3201,62 +3276,139 @@
         if(st.endDate) dates.push(st.endDate);
       });
     });
-    var minD = dates.reduce(function(a,b){ return b<a?b:a; });
-    var maxD = dates.reduce(function(a,b){ return b>a?b:a; });
-    var rangeStart = addDaysIso(minD, -3);
-    var totalDays = Math.max(7, daysBetweenIso(rangeStart, addDaysIso(maxD, 3)) + 1);
-    var totalPx = totalDays * GANTT_DAY_PX;
-    function offsetPx(iso){ return daysBetweenIso(rangeStart, iso) * GANTT_DAY_PX; }
-    var todayPx = offsetPx(todayISO());
-    var todayLine = '<div class="gantt-today" style="left:'+todayPx+'px;" data-tip="Today"></div>';
-
-    var ticks = [];
-    for(var off=0; off<=totalDays; off+=7){
-      var tIso = addDaysIso(rangeStart, off);
-      ticks.push('<div class="gantt-tick" style="left:'+(off*GANTT_DAY_PX)+'px;">'+fmtDateShort(tIso)+'</div>');
-    }
+    var scale = buildGanttScale_(dates);
+    var offsetPx = scale.offsetPx, totalPx = scale.totalPx, todayLine = scale.todayLine;
 
     var rowsHtml = [];
     sprints.forEach(function(sp){
-      var spStart = sp.startDate, spEnd = sp.endDate || sp.startDate;
-      var spBar = (spStart && spEnd) ?
-        '<div class="gantt-bar is-sprint-bar" style="left:'+offsetPx(spStart)+'px;width:'+Math.max(GANTT_DAY_PX,(daysBetweenIso(spStart,spEnd)+1)*GANTT_DAY_PX)+'px;" '+
-        'data-tip="'+esc(sp.name)+': '+fmtDateShort(spStart)+' – '+fmtDateShort(spEnd)+'"></div>' : '';
+      var collapsed = !!state.collapsedSprints[sp.id];
+      var steps = stepsForSprint(sp.id);
       rowsHtml.push('<div class="gantt-row is-sprint">'+
         '<div class="gantt-label is-sprint" data-edit-sprint="'+esc(sp.id)+'"><div class="sprint-group-head">'+
-        '<span class="gantt-label-name" data-tip="'+esc(sp.name)+'">'+esc(sp.name)+'</span>'+
-        (admin ? '<span class="sprint-group-actions"><button class="icon-btn" data-add-step="'+esc(sp.id)+'" data-tip="Add step to this sprint">+ step</button></span>' : '')+
+        '<button class="gantt-caret" data-toggle-sprint="'+esc(sp.id)+'" data-tip="'+(collapsed?'Expand':'Collapse')+' this sprint" aria-label="'+(collapsed?'Expand':'Collapse')+' '+esc(sp.name)+'">'+(collapsed?'▸':'▾')+'</button>'+
+        '<span class="gantt-label-name" data-tip="'+esc(sp.name)+'">'+esc(sp.name)+(collapsed?' ('+steps.length+')':'')+'</span>'+
+        '<span class="sprint-group-actions"><button class="icon-btn" data-add-step="'+esc(sp.id)+'" data-tip="Add step to this sprint">+ step</button></span>'+
         '</div></div>'+
-        '<div class="gantt-track" style="width:'+totalPx+'px;">'+spBar+todayLine+'</div>'+
+        '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttSprintBarHtml_(sp, offsetPx)+todayLine+'</div>'+
         '</div>');
-      stepsForSprint(sp.id).forEach(function(st){
-        var stStart = st.startDate, stEnd = st.endDate || st.startDate;
-        var bar = '';
-        if(stStart && stEnd){
-          var left = offsetPx(stStart), w = Math.max(GANTT_DAY_PX, (daysBetweenIso(stStart,stEnd)+1)*GANTT_DAY_PX);
-          var label = w > 56 ? '<span class="gantt-bar-label">'+esc(st.name)+'</span>' : '';
-          var tip = esc(st.name)+' · '+esc(st.status||'Not Started')+(st.assignedStudent?' · '+esc(st.assignedStudent):'')+' · '+fmtDateShort(stStart)+' – '+fmtDateShort(stEnd);
-          bar = '<div class="gantt-bar" data-edit-step="'+esc(st.id)+'" style="left:'+left+'px;width:'+w+'px;background:'+stepStatusColor(st.status)+';" data-tip="'+tip+'">'+label+'</div>';
-        }
+      if(collapsed) return;
+      steps.forEach(function(st){
         rowsHtml.push('<div class="gantt-row is-step">'+
           '<div class="gantt-label is-step" data-edit-step="'+esc(st.id)+'"><span class="gantt-label-name" data-tip="'+esc(st.name)+'">'+esc(st.name)+'</span></div>'+
-          '<div class="gantt-track" style="width:'+totalPx+'px;">'+bar+todayLine+'</div>'+
+          '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttStepBarHtml_(st, offsetPx)+todayLine+'</div>'+
           '</div>');
       });
     });
 
     wrap.innerHTML =
-      '<div class="gantt-header"><div class="gantt-label"></div><div class="gantt-ticks" style="width:'+totalPx+'px;">'+ticks.join('')+todayLine+'</div></div>'+
+      '<div class="gantt-header"><div class="gantt-label"></div><div class="gantt-ticks" style="width:'+totalPx+'px;">'+scale.ticksHtml+todayLine+'</div></div>'+
       '<div class="gantt-body">'+rowsHtml.join('')+'</div>';
     bindTooltips(wrap);
+    wrap.querySelectorAll('[data-toggle-sprint]').forEach(function(btn){
+      btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        var id = btn.getAttribute('data-toggle-sprint');
+        if(state.collapsedSprints[id]) delete state.collapsedSprints[id]; else state.collapsedSprints[id] = true;
+        renderGantt(projectId);
+      });
+    });
     wrap.querySelectorAll('[data-edit-sprint]').forEach(function(el){
-      el.addEventListener('click', function(e){ if(e.target.closest('[data-add-step]')) return; openSprintModal(el.getAttribute('data-edit-sprint')); });
+      el.addEventListener('click', function(e){ if(e.target.closest('[data-add-step],[data-toggle-sprint]')) return; openSprintModal(el.getAttribute('data-edit-sprint')); });
     });
     wrap.querySelectorAll('[data-add-step]').forEach(function(btn){
       btn.addEventListener('click', function(e){ e.stopPropagation(); openStepModal(null, btn.getAttribute('data-add-step')); });
     });
     wrap.querySelectorAll('[data-edit-step]').forEach(function(el){
       el.addEventListener('click', function(){ openStepModal(el.getAttribute('data-edit-step')); });
+    });
+  }
+
+  /** Admin-only combined timeline across every member's projects, same visual language as
+   *  the per-project Gantt above plus an extra Project grouping level, everything
+   *  collapsible (state.collapsedProjects / state.collapsedSprints — shared with the
+   *  per-project view above, so a fold state carries over between the two).
+   *
+   *  This view is deliberately look-but-click-through, not edit-in-place: a sprint/step's
+   *  save handler stamps its project from state.detailProject (see openSprintModal/
+   *  openStepModal below), which is only correct once you've actually navigated into that
+   *  project's own detail page. So every row here — project, sprint, or step — opens that
+   *  project's detail view on click instead of an edit modal directly; the caret toggles
+   *  are the one thing that don't navigate. */
+  function renderAdminTimeline(){
+    var wrap = document.getElementById('admin-timeline-gantt');
+    if(!state.projects.length){
+      wrap.innerHTML = '<div class="project-empty">No projects yet across the team.</div>';
+      return;
+    }
+    var dates = [todayISO()];
+    state.sprints.forEach(function(sp){ if(sp.startDate) dates.push(sp.startDate); if(sp.endDate) dates.push(sp.endDate); });
+    state.steps.forEach(function(st){ if(st.startDate) dates.push(st.startDate); if(st.endDate) dates.push(st.endDate); });
+    var scale = buildGanttScale_(dates);
+    var offsetPx = scale.offsetPx, totalPx = scale.totalPx, todayLine = scale.todayLine;
+
+    var rowsHtml = [];
+    state.projects.forEach(function(p){
+      var pCollapsed = !!state.collapsedProjects[p.id];
+      var sprints = sprintsForProject(p.id);
+      var stepCount = stepsForProject(p.id).length;
+      rowsHtml.push('<div class="gantt-row is-project">'+
+        '<div class="gantt-label is-project" data-open-project="'+esc(p.id)+'"><div class="sprint-group-head">'+
+        '<button class="gantt-caret" data-toggle-project="'+esc(p.id)+'" data-tip="'+(pCollapsed?'Expand':'Collapse')+' this project" aria-label="'+(pCollapsed?'Expand':'Collapse')+' '+esc(p.name)+'">'+(pCollapsed?'▸':'▾')+'</button>'+
+        '<span class="project-dot" style="background:'+projectColor(p.id)+'"></span>'+
+        '<span class="gantt-label-name" data-tip="Open '+esc(p.name)+(p.ownerName?' · '+esc(p.ownerName):'')+'">'+esc(p.name)+(pCollapsed?' ('+sprints.length+' sprint'+(sprints.length===1?'':'s')+', '+stepCount+' step'+(stepCount===1?'':'s')+')':'')+'</span>'+
+        (p.ownerName ? '<span class="project-owner-tag">'+esc(p.ownerName)+'</span>' : '')+
+        '</div></div>'+
+        '<div class="gantt-track" style="width:'+totalPx+'px;">'+todayLine+'</div>'+
+        '</div>');
+      if(pCollapsed) return;
+      if(!sprints.length){
+        rowsHtml.push('<div class="gantt-row is-sprint"><div class="gantt-label is-sprint is-nested" data-open-project="'+esc(p.id)+'">'+
+          '<span class="gantt-label-name" style="font-style:italic;color:var(--text-muted);">No sprints yet</span></div>'+
+          '<div class="gantt-track" style="width:'+totalPx+'px;">'+todayLine+'</div></div>');
+        return;
+      }
+      sprints.forEach(function(sp){
+        var sCollapsed = !!state.collapsedSprints[sp.id];
+        var steps = stepsForSprint(sp.id);
+        rowsHtml.push('<div class="gantt-row is-sprint">'+
+          '<div class="gantt-label is-sprint is-nested" data-open-project="'+esc(p.id)+'"><div class="sprint-group-head">'+
+          '<button class="gantt-caret" data-toggle-sprint="'+esc(sp.id)+'" data-tip="'+(sCollapsed?'Expand':'Collapse')+' this sprint" aria-label="'+(sCollapsed?'Expand':'Collapse')+' '+esc(sp.name)+'">'+(sCollapsed?'▸':'▾')+'</button>'+
+          '<span class="gantt-label-name" data-tip="Open '+esc(p.name)+'">'+esc(sp.name)+(sCollapsed?' ('+steps.length+')':'')+'</span>'+
+          '</div></div>'+
+          '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttSprintBarHtml_(sp, offsetPx)+todayLine+'</div>'+
+          '</div>');
+        if(sCollapsed) return;
+        steps.forEach(function(st){
+          rowsHtml.push('<div class="gantt-row is-step">'+
+            '<div class="gantt-label is-step is-nested" data-open-project="'+esc(p.id)+'"><span class="gantt-label-name" data-tip="Open '+esc(p.name)+'">'+esc(st.name)+'</span></div>'+
+            '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttStepBarHtml_(st, offsetPx)+todayLine+'</div>'+
+            '</div>');
+        });
+      });
+    });
+
+    wrap.innerHTML =
+      '<div class="gantt-header"><div class="gantt-label"></div><div class="gantt-ticks" style="width:'+totalPx+'px;">'+scale.ticksHtml+todayLine+'</div></div>'+
+      '<div class="gantt-body">'+rowsHtml.join('')+'</div>';
+    bindTooltips(wrap);
+    wrap.querySelectorAll('[data-toggle-project]').forEach(function(btn){
+      btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        var id = btn.getAttribute('data-toggle-project');
+        if(state.collapsedProjects[id]) delete state.collapsedProjects[id]; else state.collapsedProjects[id] = true;
+        renderAdminTimeline();
+      });
+    });
+    wrap.querySelectorAll('[data-toggle-sprint]').forEach(function(btn){
+      btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        var id = btn.getAttribute('data-toggle-sprint');
+        if(state.collapsedSprints[id]) delete state.collapsedSprints[id]; else state.collapsedSprints[id] = true;
+        renderAdminTimeline();
+      });
+    });
+    wrap.querySelectorAll('[data-open-project]').forEach(function(el){
+      el.addEventListener('click', function(e){ if(e.target.closest('[data-toggle-project],[data-toggle-sprint]')) return; openProjectDetail(el.getAttribute('data-open-project')); });
     });
   }
 
@@ -3285,7 +3437,7 @@
     if(SAMPLE){
       var now = new Date().toISOString();
       if(isEdit){ Object.assign(projectById(state.editingProjectId), data, {updatedAt: now}); }
-      else { data.id = 'local-'+Date.now(); data.createdAt = now; data.updatedAt = now; state.projects.push(data); }
+      else { data.id = 'local-'+Date.now(); data.createdAt = now; data.updatedAt = now; data.ownerName = state.myName || 'You'; state.projects.push(data); }
       renderProjectsTab(); if(isEdit) renderProjectDetail();
       closeProjectModal(); showToast('Saved (sample mode — connect Settings to persist for real).');
       return;
