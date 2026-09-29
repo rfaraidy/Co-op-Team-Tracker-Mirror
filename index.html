@@ -483,6 +483,15 @@
   .gantt-bar-label{font-size:11px;font-weight:600;color:#fff;padding:0 8px;white-space:nowrap;
     overflow:hidden;text-overflow:ellipsis;}
   .gantt-bar.is-sprint-bar{background:transparent;border:1.5px dashed var(--text-muted);height:10px;top:12px;}
+  .gantt-bar.is-pill{border-radius:999px;}
+  .gantt-bar-handle{position:absolute;right:3px;top:50%;transform:translateY(-50%);width:13px;height:13px;
+    border-radius:50%;background:rgba(255,255,255,.55);}
+  .gantt-label.is-member{font-weight:700;color:var(--text-primary);background:var(--surface-1);cursor:pointer;}
+  .gantt-label.is-member:hover{background:var(--page);}
+  .gantt-row.is-member .gantt-track{background:var(--surface-1);}
+  .gantt-row.is-sprint.is-clickable{cursor:pointer;}
+  .gantt-row.is-sprint.is-clickable:hover .gantt-track{background:var(--gridline);}
+  .gantt-open-btn{align-self:center;margin-right:10px;white-space:nowrap;flex-shrink:0;}
   .gantt-header{display:flex;position:sticky;top:0;background:var(--surface-1);z-index:2;border-bottom:1px solid var(--border);}
   .gantt-header .gantt-label{background:var(--surface-1);}
   .gantt-ticks{position:relative;flex:1;min-height:30px;}
@@ -757,13 +766,14 @@
     <div class="card-panel" id="admin-timeline-panel" style="display:none;margin-top:22px;">
       <div class="section-head" style="margin:0 0 12px;"><h2>All projects — combined timeline</h2></div>
       <div class="gantt-wrap" id="admin-timeline-gantt"></div>
-      <div class="gantt-legend" style="margin-top:10px;">
+      <div class="gantt-legend" id="admin-timeline-project-legend" style="margin-top:10px;"></div>
+      <div class="gantt-legend" style="margin-top:4px;">
         <span><i class="dot" style="background:var(--text-muted);"></i>Not Started</span>
         <span><i class="dot" style="background:var(--status-info);"></i>In Progress</span>
         <span><i class="dot" style="background:var(--series-1);"></i>Submitted</span>
         <span><i class="dot" style="background:var(--status-good);"></i>Approved</span>
         <span><i class="dot" style="background:var(--status-critical);"></i>Blocked</span>
-        <span>&nbsp;·&nbsp;click a row to open that project</span>
+        <span>&nbsp;·&nbsp;click a sprint to show its steps · ↗ opens that project to edit</span>
       </div>
     </div>
 
@@ -1159,7 +1169,13 @@
     detailStudent: null, studentDetailFrom: 'overview',
     projects: [], sprints: [], steps: [], detailProject: null, projectsCalMonth: todayMonth(),
     editingProjectId: null, editingSprintId: null, editingStepId: null, stepSprintContext: null,
-    collapsedSprints: {}, collapsedProjects: {} };
+    collapsedSprints: {}, collapsedProjects: {},
+    // Admin's combined timeline (renderAdminTimeline) has its own independent fold
+    // state, deliberately separate from collapsedSprints/collapsedProjects above (which
+    // belong to the per-project Gantt) so toggling one view never affects the other.
+    // A sprint here starts collapsed (id absent) — expandedAdminSprints[id] === true is
+    // the one that means "showing its steps."
+    collapsedAdminMembers: {}, expandedAdminSprints: {} };
   /** True when signed in with a personal (student) passcode rather than the admin passphrase
    *  or sample/demo mode — the dashboard is scoped to just this one person's data. */
   function isPersonal(){ return !SAMPLE && state.role === 'member'; }
@@ -3276,6 +3292,17 @@
     return '<div class="gantt-bar is-sprint-bar" style="left:'+offsetPx(spStart)+'px;width:'+Math.max(GANTT_DAY_PX,(daysBetweenIso(spStart,spEnd)+1)*GANTT_DAY_PX)+'px;" '+
       'data-tip="'+esc(sp.name)+': '+fmtDateShort(spStart)+' – '+fmtDateShort(spEnd)+'"></div>';
   }
+  /** Solid, rounded "pill" sprint bar (colored by project) with a small handle dot at its
+   *  end — used only by the admin's combined timeline (renderAdminTimeline), which colors
+   *  by project instead of the dashed outline style the per-project Gantt uses. */
+  function ganttMemberPillHtml_(sp, offsetPx, color){
+    var spStart = sp.startDate, spEnd = sp.endDate || sp.startDate;
+    if(!spStart || !spEnd) return '';
+    var left = offsetPx(spStart), w = Math.max(GANTT_DAY_PX, (daysBetweenIso(spStart,spEnd)+1)*GANTT_DAY_PX);
+    var label = w > 56 ? '<span class="gantt-bar-label">'+esc(sp.name)+'</span>' : '';
+    return '<div class="gantt-bar is-pill" style="left:'+left+'px;width:'+w+'px;background:'+color+';" '+
+      'data-tip="'+esc(sp.name)+': '+fmtDateShort(spStart)+' – '+fmtDateShort(spEnd)+'">'+label+'<span class="gantt-bar-handle"></span></div>';
+  }
 
   /** Renders one project's Gantt: one dashed outline bar per sprint (spanning its own
    *  start–end) with its steps as colored sub-rows underneath, all sharing one date axis.
@@ -3346,23 +3373,30 @@
     });
   }
 
-  /** Admin-only combined timeline across every member's projects, same visual language as
-   *  the per-project Gantt above plus an extra Project grouping level, everything
-   *  collapsible (state.collapsedProjects / state.collapsedSprints — shared with the
-   *  per-project view above, so a fold state carries over between the two).
-   *
-   *  This view is deliberately look-but-click-through, not edit-in-place: a sprint/step's
-   *  save handler stamps its project from state.detailProject (see openSprintModal/
-   *  openStepModal below), which is only correct once you've actually navigated into that
-   *  project's own detail page. So every row here — project, sprint, or step — opens that
-   *  project's detail view on click instead of an edit modal directly; the caret toggles
-   *  are the one thing that don't navigate. */
+  /** Admin-only combined timeline across every member's projects, grouped by team member
+   *  (one row group per person, avatar + name) with each of their sprints as a solid
+   *  colored pill bar underneath, colored by project. Clicking a sprint expands it in
+   *  place to show its steps right there (state.expandedAdminSprints) — this is purely a
+   *  read view, though: a sprint/step's save handler stamps its project from
+   *  state.detailProject (see openSprintModal/openStepModal below), which is only correct
+   *  once you've actually navigated into that project's own detail page, so editing always
+   *  goes through the small "↗" open button rather than an edit modal directly from here. */
   function renderAdminTimeline(){
     var wrap = document.getElementById('admin-timeline-gantt');
+    var legendWrap = document.getElementById('admin-timeline-project-legend');
     if(!state.projects.length){
       wrap.innerHTML = '<div class="project-empty">No projects yet across the team.</div>';
+      if(legendWrap) legendWrap.innerHTML = '';
       return;
     }
+    var byOwner = {}, ownerOrder = [];
+    state.projects.forEach(function(p){
+      var owner = p.ownerName || 'Unassigned';
+      if(!byOwner[owner]){ byOwner[owner] = []; ownerOrder.push(owner); }
+      byOwner[owner].push(p);
+    });
+    ownerOrder.sort(function(a,b){ return a.localeCompare(b); });
+
     var dates = [todayISO()];
     state.sprints.forEach(function(sp){ if(sp.startDate) dates.push(sp.startDate); if(sp.endDate) dates.push(sp.endDate); });
     state.steps.forEach(function(st){ if(st.startDate) dates.push(st.startDate); if(st.endDate) dates.push(st.endDate); });
@@ -3370,68 +3404,88 @@
     var offsetPx = scale.offsetPx, totalPx = scale.totalPx, todayLine = scale.todayLine;
 
     var rowsHtml = [];
-    state.projects.forEach(function(p){
-      var pCollapsed = !!state.collapsedProjects[p.id];
-      var sprints = sprintsForProject(p.id);
-      var stepCount = stepsForProject(p.id).length;
-      rowsHtml.push('<div class="gantt-row is-project">'+
-        '<div class="gantt-label is-project" data-open-project="'+esc(p.id)+'"><div class="sprint-group-head">'+
-        '<button class="gantt-caret" data-toggle-project="'+esc(p.id)+'" data-tip="'+(pCollapsed?'Expand':'Collapse')+' this project" aria-label="'+(pCollapsed?'Expand':'Collapse')+' '+esc(p.name)+'">'+(pCollapsed?'▸':'▾')+'</button>'+
-        '<span class="project-dot" style="background:'+projectColor(p.id)+'"></span>'+
-        '<span class="gantt-label-name" data-tip="Open '+esc(p.name)+(p.ownerName?' · '+esc(p.ownerName):'')+'">'+esc(p.name)+(pCollapsed?' ('+sprints.length+' sprint'+(sprints.length===1?'':'s')+', '+stepCount+' step'+(stepCount===1?'':'s')+')':'')+'</span>'+
-        (p.ownerName ? '<span class="project-owner-tag">'+esc(p.ownerName)+'</span>' : '')+
+    ownerOrder.forEach(function(owner){
+      var projects = byOwner[owner];
+      var mCollapsed = !!state.collapsedAdminMembers[owner];
+      var sprintTotal = 0;
+      projects.forEach(function(p){ sprintTotal += sprintsForProject(p.id).length; });
+      rowsHtml.push('<div class="gantt-row is-member">'+
+        '<div class="gantt-label is-member" data-toggle-member="'+esc(owner)+'"><div class="sprint-group-head">'+
+        '<span class="gantt-caret" aria-hidden="true">'+(mCollapsed?'▸':'▾')+'</span>'+
+        '<span class="avatar-sm" style="background:'+studentColor(owner)+'">'+initials(owner)+'</span>'+
+        '<span class="gantt-label-name" data-tip="'+esc(owner)+'">'+esc(owner)+(mCollapsed?' ('+sprintTotal+' sprint'+(sprintTotal===1?'':'s')+')':'')+'</span>'+
         '</div></div>'+
         '<div class="gantt-track" style="width:'+totalPx+'px;">'+todayLine+'</div>'+
         '</div>');
-      if(pCollapsed) return;
-      if(!sprints.length){
-        rowsHtml.push('<div class="gantt-row is-sprint"><div class="gantt-label is-sprint is-nested" data-open-project="'+esc(p.id)+'">'+
-          '<span class="gantt-label-name" style="font-style:italic;color:var(--text-muted);">No sprints yet</span></div>'+
-          '<div class="gantt-track" style="width:'+totalPx+'px;">'+todayLine+'</div></div>');
-        return;
-      }
-      sprints.forEach(function(sp){
-        var sCollapsed = !!state.collapsedSprints[sp.id];
-        var steps = stepsForSprint(sp.id);
-        rowsHtml.push('<div class="gantt-row is-sprint">'+
-          '<div class="gantt-label is-sprint is-nested" data-open-project="'+esc(p.id)+'"><div class="sprint-group-head">'+
-          '<button class="gantt-caret" data-toggle-sprint="'+esc(sp.id)+'" data-tip="'+(sCollapsed?'Expand':'Collapse')+' this sprint" aria-label="'+(sCollapsed?'Expand':'Collapse')+' '+esc(sp.name)+'">'+(sCollapsed?'▸':'▾')+'</button>'+
-          '<span class="gantt-label-name" data-tip="Open '+esc(p.name)+'">'+esc(sp.name)+(sCollapsed?' ('+steps.length+')':'')+'</span>'+
-          '</div></div>'+
-          '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttSprintBarHtml_(sp, offsetPx)+todayLine+'</div>'+
-          '</div>');
-        if(sCollapsed) return;
-        steps.forEach(function(st){
-          rowsHtml.push('<div class="gantt-row is-step">'+
-            '<div class="gantt-label is-step is-nested" data-open-project="'+esc(p.id)+'"><span class="gantt-label-name" data-tip="Open '+esc(p.name)+'">'+esc(st.name)+'</span></div>'+
-            '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttStepBarHtml_(st, offsetPx)+todayLine+'</div>'+
+      if(mCollapsed) return;
+
+      var anySprint = false;
+      var showProjectTag = projects.length > 1;
+      projects.forEach(function(p){
+        sprintsForProject(p.id).forEach(function(sp){
+          anySprint = true;
+          var expanded = !!state.expandedAdminSprints[sp.id];
+          var steps = stepsForSprint(sp.id);
+          rowsHtml.push('<div class="gantt-row is-sprint is-clickable" data-toggle-admin-sprint="'+esc(sp.id)+'">'+
+            '<div class="gantt-label is-sprint is-nested"><div class="sprint-group-head">'+
+            '<span class="gantt-caret" aria-hidden="true" data-tip="'+(expanded?'Hide':'Show')+' this sprint\'s steps">'+(expanded?'▾':'▸')+'</span>'+
+            '<span class="project-dot" style="background:'+projectColor(p.id)+'"></span>'+
+            '<span class="gantt-label-name" data-tip="'+esc(sp.name)+(showProjectTag?' · '+esc(p.name):'')+'">'+esc(sp.name)+(steps.length ? ' ('+steps.length+')' : '')+'</span>'+
+            (showProjectTag ? '<span class="project-owner-tag">'+esc(p.name)+'</span>' : '')+
+            '</div></div>'+
+            '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttMemberPillHtml_(sp, offsetPx, projectColor(p.id))+todayLine+'</div>'+
+            '<button class="icon-btn gantt-open-btn" data-open-project="'+esc(p.id)+'" data-tip="Open '+esc(p.name)+' to edit">Open ↗</button>'+
             '</div>');
+          if(!expanded) return;
+          if(!steps.length){
+            rowsHtml.push('<div class="gantt-row is-step"><div class="gantt-label is-step is-nested">'+
+              '<span class="gantt-label-name" style="font-style:italic;color:var(--text-muted);">No steps yet</span></div>'+
+              '<div class="gantt-track" style="width:'+totalPx+'px;">'+todayLine+'</div></div>');
+            return;
+          }
+          steps.forEach(function(st){
+            rowsHtml.push('<div class="gantt-row is-step">'+
+              '<div class="gantt-label is-step is-nested" data-open-project="'+esc(p.id)+'"><span class="gantt-label-name" data-tip="Open '+esc(p.name)+'">'+esc(st.name)+'</span></div>'+
+              '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttStepBarHtml_(st, offsetPx)+todayLine+'</div>'+
+              '</div>');
+          });
         });
       });
+      if(!anySprint){
+        rowsHtml.push('<div class="gantt-row is-sprint"><div class="gantt-label is-sprint is-nested">'+
+          '<span class="gantt-label-name" style="font-style:italic;color:var(--text-muted);">No sprints yet</span></div>'+
+          '<div class="gantt-track" style="width:'+totalPx+'px;">'+todayLine+'</div></div>');
+      }
     });
 
     wrap.innerHTML =
       '<div class="gantt-header"><div class="gantt-label"></div><div class="gantt-ticks" style="width:'+totalPx+'px;">'+scale.ticksHtml+todayLine+'</div></div>'+
       '<div class="gantt-body">'+rowsHtml.join('')+'</div>';
     bindTooltips(wrap);
-    wrap.querySelectorAll('[data-toggle-project]').forEach(function(btn){
-      btn.addEventListener('click', function(e){
-        e.stopPropagation();
-        var id = btn.getAttribute('data-toggle-project');
-        if(state.collapsedProjects[id]) delete state.collapsedProjects[id]; else state.collapsedProjects[id] = true;
+
+    if(legendWrap){
+      legendWrap.innerHTML = state.projects.map(function(p){
+        return '<span><i class="dot" style="background:'+projectColor(p.id)+'"></i>'+esc(p.name)+'</span>';
+      }).join('');
+    }
+
+    wrap.querySelectorAll('[data-toggle-member]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var owner = el.getAttribute('data-toggle-member');
+        if(state.collapsedAdminMembers[owner]) delete state.collapsedAdminMembers[owner]; else state.collapsedAdminMembers[owner] = true;
         renderAdminTimeline();
       });
     });
-    wrap.querySelectorAll('[data-toggle-sprint]').forEach(function(btn){
-      btn.addEventListener('click', function(e){
-        e.stopPropagation();
-        var id = btn.getAttribute('data-toggle-sprint');
-        if(state.collapsedSprints[id]) delete state.collapsedSprints[id]; else state.collapsedSprints[id] = true;
+    wrap.querySelectorAll('[data-toggle-admin-sprint]').forEach(function(row){
+      row.addEventListener('click', function(e){
+        if(e.target.closest('[data-open-project]')) return;
+        var id = row.getAttribute('data-toggle-admin-sprint');
+        if(state.expandedAdminSprints[id]) delete state.expandedAdminSprints[id]; else state.expandedAdminSprints[id] = true;
         renderAdminTimeline();
       });
     });
     wrap.querySelectorAll('[data-open-project]').forEach(function(el){
-      el.addEventListener('click', function(e){ if(e.target.closest('[data-toggle-project],[data-toggle-sprint]')) return; openProjectDetail(el.getAttribute('data-open-project')); });
+      el.addEventListener('click', function(e){ e.stopPropagation(); openProjectDetail(el.getAttribute('data-open-project')); });
     });
   }
 
