@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Competitions and Direct Incentives Team</title>
+<title>Competitons and Direct Commissions Team</title>
 <style>
   /* ---------- STC brand palette (#4f008c deep purple · #a54ee1 violet ·
      #ff375e rose · #ffffff white) applied as: deep purple = primary action
@@ -375,14 +375,37 @@
   .chip-check input{margin:0;accent-color:var(--series-1);}
   .chip-check:hover{border-color:var(--text-muted);}
   .chip-check.checked{border-color:var(--series-1);color:var(--text-primary);background:var(--surface-1);font-weight:600;}
-  .wr-manual-toggle{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:var(--text-secondary);
-    cursor:pointer;user-select:none;margin:2px 0 12px;line-height:1.4;}
-  .wr-manual-toggle input{margin:2px 0 0;accent-color:var(--series-1);flex:none;}
-  .wr-manual-fields{border-top:1px solid var(--border);padding-top:12px;margin-top:2px;}
   .report-status{min-height:14px;}
   .report-status.is-busy{color:var(--text-secondary);}
   .report-status.is-error{color:var(--status-critical);}
   .report-status.is-ok{color:var(--status-good);}
+  .field-group-label{display:flex;align-items:baseline;justify-content:space-between;margin:18px 0 8px;
+    padding-top:14px;border-top:1px solid var(--gridline);}
+  .field-group-label:first-of-type{margin-top:12px;padding-top:0;border-top:none;}
+  .field-group-label span{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);}
+  .field-group-label .filter-count{font-size:11px;color:var(--text-secondary);font-weight:500;text-transform:none;letter-spacing:0;}
+  .chip-row-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;}
+  .chip-row-head label{margin-bottom:0;}
+  .chip-quick-actions{display:flex;gap:8px;}
+  .chip-quick-actions button{background:none;border:none;padding:0;font-size:11px;color:var(--series-1);
+    cursor:pointer;font-family:inherit;}
+  .chip-quick-actions button:hover{text-decoration:underline;}
+  .wr-slide-list{list-style:none;margin:0 0 14px;padding:0;display:flex;flex-direction:column;gap:7px;}
+  .wr-slide-list li{display:flex;align-items:flex-start;gap:9px;font-size:12.5px;color:var(--text-secondary);line-height:1.4;}
+  .wr-slide-list .wr-slide-icon{flex-shrink:0;width:22px;height:22px;border-radius:7px;background:var(--page);
+    display:flex;align-items:center;justify-content:center;font-size:12px;margin-top:-1px;}
+  .wr-bounds-preview{display:grid;grid-template-columns:1fr 1fr;gap:10px;background:var(--page);
+    border-radius:8px;padding:10px 12px;margin-bottom:14px;}
+  .wr-bounds-preview .wrb-col span{display:block;}
+  .wr-bounds-preview .wrb-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--text-muted);margin-bottom:2px;}
+  .wr-bounds-preview .wrb-dates{font-size:13px;font-weight:600;color:var(--text-primary);}
+  .wr-manual-toggle{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-secondary);
+    cursor:pointer;user-select:none;margin-bottom:4px;}
+  .wr-manual-toggle input{margin:0;accent-color:var(--series-1);}
+  .wr-manual-fields{display:none;margin-top:10px;padding-top:12px;border-top:1px solid var(--gridline);}
+  .wr-manual-fields.show{display:block;}
+  .wr-manual-fields .range-sub-label{font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;}
+  .wr-manual-fields .row2{margin-bottom:12px;}
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--text-primary);color:var(--page);
     padding:10px 18px;border-radius:8px;font-size:13px;z-index:70;display:none;}
   .toast.show{display:block;}
@@ -418,6 +441,59 @@
     .cal-day{min-height:44px;padding:3px;}
     .cal-dow{font-size:8.5px;}
   }
+
+  /* ---------- Projects tab (Projects -> Sprints -> Steps) ---------- */
+  .project-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;}
+  .project-card{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);
+    padding:16px;cursor:pointer;transition:transform .12s,border-color .12s;}
+  .project-card:hover{border-color:var(--series-1);transform:translateY(-1px);}
+  .project-card:focus-visible{outline:2px solid var(--series-1);outline-offset:1px;}
+  .project-card-top{display:flex;align-items:center;gap:9px;margin-bottom:9px;}
+  .project-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;}
+  .project-card-name{font-size:15px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .project-card-desc{font-size:12.5px;color:var(--text-secondary);margin-bottom:12px;min-height:18px;
+    overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+  .project-card-stats{display:flex;gap:14px;font-size:12px;color:var(--text-muted);}
+  .project-card-stats b{color:var(--text-primary);font-weight:700;}
+  .project-card-actions{display:flex;gap:6px;margin-top:12px;}
+  .project-empty{padding:28px 10px;text-align:center;color:var(--text-muted);font-size:13px;}
+
+  /* Gantt timeline (project detail) */
+  .gantt-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-1);}
+  .gantt-row{display:flex;border-bottom:1px solid var(--gridline);}
+  .gantt-row:last-child{border-bottom:none;}
+  .gantt-label{width:220px;flex-shrink:0;padding:8px 10px;font-size:12.5px;position:sticky;left:0;
+    background:var(--surface-1);border-right:1px solid var(--border);display:flex;align-items:center;gap:6px;z-index:1;}
+  .gantt-label.is-sprint{font-weight:700;color:var(--text-primary);background:var(--page);}
+  .gantt-label.is-step{color:var(--text-secondary);padding-left:22px;}
+  .gantt-label-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .gantt-track{position:relative;flex:1;min-height:34px;}
+  .gantt-row.is-sprint .gantt-track{background:var(--page);}
+  .gantt-bar{position:absolute;top:7px;height:20px;border-radius:4px;cursor:pointer;
+    display:flex;align-items:center;overflow:hidden;transition:filter .1s;}
+  .gantt-bar:hover{filter:brightness(1.08);}
+  .gantt-bar-label{font-size:11px;font-weight:600;color:#fff;padding:0 8px;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;}
+  .gantt-bar.is-sprint-bar{background:transparent;border:1.5px dashed var(--text-muted);height:10px;top:12px;}
+  .gantt-header{display:flex;position:sticky;top:0;background:var(--surface-1);z-index:2;border-bottom:1px solid var(--border);}
+  .gantt-header .gantt-label{background:var(--surface-1);}
+  .gantt-ticks{position:relative;flex:1;min-height:30px;}
+  .gantt-tick{position:absolute;top:0;bottom:0;border-left:1px solid var(--gridline);padding:6px 0 0 5px;
+    font-size:10.5px;color:var(--text-muted);white-space:nowrap;}
+  .gantt-today{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed var(--status-critical);z-index:1;}
+  .gantt-body{position:relative;}
+  .gantt-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--text-secondary);margin-top:12px;}
+  .gantt-legend span{display:inline-flex;align-items:center;gap:6px;}
+  .gantt-legend i{width:10px;height:10px;border-radius:3px;display:inline-block;}
+  .sprint-group-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .sprint-group-actions{display:flex;gap:4px;flex-shrink:0;}
+  .icon-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px 4px;font-size:12px;line-height:1;border-radius:4px;}
+  .icon-btn:hover{color:var(--text-primary);background:var(--gridline);}
+  @media (max-width:760px){
+    .project-grid{grid-template-columns:1fr 1fr;}
+    .gantt-label{width:150px;}
+    .gantt-label.is-step{padding-left:14px;}
+  }
 </style>
 </head>
 <body>
@@ -426,7 +502,7 @@
 
   <header class="top">
     <div>
-      <h1>Competitions and Direct Incentives Team</h1>
+      <h1>Competitons and Direct Commissions Team</h1>
       <p>Progress board — sign in with your personal passcode for your own dashboard, or the admin passphrase for the full team view.</p>
     </div>
     <div class="top-actions">
@@ -452,6 +528,7 @@
     <button class="tab" data-view="weekly">Weekly</button>
     <button class="tab" data-view="monthly">Monthly</button>
     <button class="tab" data-view="all">All Tasks</button>
+    <button class="tab" data-view="projects">Projects</button>
   </div>
 
   <!-- OVERVIEW -->
@@ -632,6 +709,76 @@
     </div>
   </section>
 
+  <!-- PROJECTS -->
+  <section class="view" id="view-projects">
+    <div class="section-head">
+      <h2>Projects</h2>
+      <button class="btn btn-primary" id="btn-add-project" style="display:none;">+ Add Project</button>
+    </div>
+
+    <div class="section-head" style="margin-top:4px;">
+      <h2>All steps calendar</h2>
+      <div class="nav-week">
+        <button class="nav-arrow" id="proj-cal-prev">‹</button>
+        <span class="lbl" id="proj-cal-label">Month</span>
+        <button class="nav-arrow" id="proj-cal-next">›</button>
+        <button class="btn btn-ghost" id="proj-cal-today" style="padding:5px 10px;">This month</button>
+      </div>
+    </div>
+    <div class="card-panel">
+      <div class="cal-grid" id="proj-calendar"></div>
+      <div class="heat-legend" style="flex-wrap:wrap;margin-top:12px;">
+        <span>&nbsp;·&nbsp; each dot is a step due that day, colored by its project — click or hover a day for details</span>
+      </div>
+    </div>
+
+    <div class="section-head" style="margin-top:22px;"><h2>Steps by project</h2></div>
+    <div class="card-panel">
+      <div class="donut-row">
+        <div class="donut-wrap" id="proj-pie"></div>
+        <div class="donut-legend" id="proj-pie-legend"></div>
+      </div>
+    </div>
+
+    <div class="section-head" style="margin-top:22px;"><h2>All projects</h2></div>
+    <div class="project-grid" id="project-grid"></div>
+  </section>
+
+  <!-- PROJECT DETAIL (drill-down, not a tab — reached by clicking a project card) -->
+  <section class="view" id="view-project-detail">
+    <button class="back-link" id="btn-project-back">‹ Back to Projects</button>
+    <div class="sd-head">
+      <span class="project-dot" id="pd-dot" style="width:16px;height:16px;"></span>
+      <div style="flex:1;min-width:0;">
+        <h1 id="pd-name">Project</h1>
+        <div id="pd-desc" style="font-size:13px;color:var(--text-secondary);margin-top:2px;"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-shrink:0;" id="pd-actions">
+        <button class="btn" id="btn-edit-project">Edit</button>
+        <button class="btn btn-danger" id="btn-delete-project">Delete</button>
+      </div>
+    </div>
+
+    <div class="section-head" style="margin-top:10px;">
+      <h2>Timeline</h2>
+      <button class="btn btn-primary" id="btn-add-sprint">+ Add Sprint</button>
+    </div>
+    <div class="gantt-wrap" id="pd-gantt"></div>
+    <div class="gantt-legend" id="pd-gantt-legend">
+      <span><i style="background:var(--text-muted)"></i>Not Started</span>
+      <span><i style="background:var(--status-info)"></i>In Progress</span>
+      <span><i style="background:var(--series-1)"></i>Submitted</span>
+      <span><i style="background:var(--status-good)"></i>Approved</span>
+      <span><i style="background:var(--status-critical)"></i>Blocked</span>
+      <span><i style="border:1.5px dashed var(--text-muted);background:transparent;"></i>Sprint span</span>
+    </div>
+
+    <div class="card-panel" id="pd-notes-panel" style="margin-top:22px;">
+      <h2 style="margin:0 0 8px;font-size:14px;">Notes</h2>
+      <div id="pd-notes" style="font-size:13px;color:var(--text-secondary);white-space:pre-wrap;"></div>
+    </div>
+  </section>
+
   <!-- STUDENT DETAIL (drill-down, not a tab — reached by clicking a student anywhere) -->
   <section class="view" id="view-student">
     <button class="back-link" id="btn-student-back">‹ Back to team</button>
@@ -794,8 +941,9 @@
   <div class="modal" style="max-width:660px;">
     <button class="close-x" id="report-close">✕</button>
     <h3>Generate report</h3>
-    <p class="meta-line" style="margin:-6px 0 14px;">Builds an on-brand PowerPoint summary from the sheet and downloads it. Leave a filter empty to include everything for that criterion — filters combine (e.g. a date range AND a student).</p>
+    <p class="meta-line" style="margin:-6px 0 0;">Builds an on-brand PowerPoint summary from the sheet and downloads it. Leave a filter empty to include everything for that criterion — filters combine (e.g. a date range AND a student).</p>
 
+    <div class="field-group-label"><span>Date filters</span></div>
     <div class="row2">
       <div class="field">
         <label>Date created</label>
@@ -811,16 +959,17 @@
       <div class="range-row" style="max-width:calc(50% - 5px);"><input type="date" id="rf-deadline-from"><span>–</span><input type="date" id="rf-deadline-to"></div>
     </div>
 
+    <div class="field-group-label"><span>Task filters</span><span class="filter-count" id="rf-filter-count"></span></div>
     <div class="field">
-      <label>Students</label>
+      <div class="chip-row-head"><label>Students</label><span class="chip-quick-actions"><button type="button" data-chip-all="rf-students">All</button><button type="button" data-chip-none="rf-students">None</button></span></div>
       <div class="chip-check-row" id="rf-students"></div>
     </div>
     <div class="field">
-      <label>Status</label>
+      <div class="chip-row-head"><label>Status</label><span class="chip-quick-actions"><button type="button" data-chip-all="rf-status">All</button><button type="button" data-chip-none="rf-status">None</button></span></div>
       <div class="chip-check-row" id="rf-status"></div>
     </div>
     <div class="field">
-      <label>Priority</label>
+      <div class="chip-row-head"><label>Priority</label><span class="chip-quick-actions"><button type="button" data-chip-all="rf-priority">All</button><button type="button" data-chip-none="rf-priority">None</button></span></div>
       <div class="chip-check-row" id="rf-priority"></div>
     </div>
 
@@ -837,25 +986,111 @@
   <div class="modal" style="max-width:480px;">
     <button class="close-x" id="wr-close">✕</button>
     <h3>Weekly Review</h3>
-    <p class="meta-line" style="margin:-6px 0 14px;">Builds a PowerPoint meeting deck: a team roster slide, a team-wide recap of the previous week (completed / on-time / not finished, with a status chart), one slide per team member listing their own previous-week tasks, and a whole-team slide of what's due in the upcoming week.</p>
-
-    <label class="wr-manual-toggle"><input type="checkbox" id="wr-manual-check">Choose the previous/upcoming week dates manually — otherwise it uses the current Sunday–Thursday work week automatically.</label>
-
-    <div class="wr-manual-fields" id="wr-manual-fields" style="display:none;">
-      <div class="field">
-        <label>Previous week (last week's recap)</label>
-        <div class="range-row"><input type="date" id="wr-last-start"><span>–</span><input type="date" id="wr-last-end"></div>
+    <p class="meta-line" style="margin:-6px 0 14px;">A PowerPoint meeting deck for the work week, built from the sheet:</p>
+    <ul class="wr-slide-list">
+      <li><span class="wr-slide-icon">👥</span><span><b style="color:var(--text-primary);">Roster</b> — everyone on the team and their focus area.</span></li>
+      <li><span class="wr-slide-icon">📈</span><span><b style="color:var(--text-primary);">Last week's recap</b> — completed / on-time / not finished, with a status chart.</span></li>
+      <li><span class="wr-slide-icon">🧑</span><span><b style="color:var(--text-primary);">Per-member pages</b> — one slide per teammate listing their own tasks from last week.</span></li>
+      <li><span class="wr-slide-icon">📅</span><span><b style="color:var(--text-primary);">This week ahead</b> — the whole team's upcoming deadlines.</span></li>
+    </ul>
+    <div class="wr-bounds-preview" id="wr-bounds-preview"></div>
+    <label class="wr-manual-toggle"><input type="checkbox" id="wr-manual-check"> Choose these dates manually instead</label>
+    <div class="wr-manual-fields" id="wr-manual-fields">
+      <div class="range-sub-label">Previous week (recap slides)</div>
+      <div class="row2">
+        <div class="field"><label>Start</label><input type="date" id="wr-lastStart"></div>
+        <div class="field"><label>End</label><input type="date" id="wr-lastEnd"></div>
       </div>
-      <div class="field" style="margin-bottom:0;">
-        <label>Upcoming week (what's due)</label>
-        <div class="range-row"><input type="date" id="wr-this-start"><span>–</span><input type="date" id="wr-this-end"></div>
+      <div class="range-sub-label">Upcoming week (due-this-week slide)</div>
+      <div class="row2">
+        <div class="field"><label>Start</label><input type="date" id="wr-thisStart"></div>
+        <div class="field"><label>End</label><input type="date" id="wr-thisEnd"></div>
       </div>
     </div>
-
     <div class="report-status" id="wr-status"></div>
     <div class="modal-actions">
       <button class="btn" id="wr-cancel">Cancel</button>
       <button class="btn btn-primary" id="btn-generate-wr">📅 Generate & download</button>
+    </div>
+  </div>
+</div>
+
+<!-- Project modal (add/edit) -->
+<div class="overlay" id="project-overlay">
+  <div class="modal">
+    <button class="close-x" id="project-close">✕</button>
+    <h3 id="project-modal-title">Add project</h3>
+    <div class="field"><label>Project name *</label><input type="text" id="pf-name" placeholder="e.g. Website Revamp"></div>
+    <div class="field"><label>Description</label><textarea id="pf-description" placeholder="What this project covers…"></textarea></div>
+    <div class="field"><label>Notes</label><textarea id="pf-notes" placeholder="Anything else worth noting…"></textarea></div>
+    <div class="modal-actions" style="justify-content:flex-end;">
+      <button class="btn" id="project-cancel">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-project">Save project</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sprint modal (add/edit) -->
+<div class="overlay" id="sprint-overlay">
+  <div class="modal">
+    <button class="close-x" id="sprint-close">✕</button>
+    <h3 id="sprint-modal-title">Add sprint</h3>
+    <div class="field"><label>Sprint name *</label><input type="text" id="sf-name" placeholder="e.g. Sprint 1"></div>
+    <div class="field"><label>Description</label><textarea id="sf-description" placeholder="What this sprint covers…"></textarea></div>
+    <div class="row2">
+      <div class="field"><label>Start date</label><input type="date" id="sf-startDate"></div>
+      <div class="field"><label>End date</label><input type="date" id="sf-endDate"></div>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="sf-notes" placeholder="Anything else worth noting…"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="btn-delete-sprint" style="display:none;">Delete</button>
+      <div class="right">
+        <button class="btn" id="sprint-cancel">Cancel</button>
+        <button class="btn btn-primary" id="btn-save-sprint">Save sprint</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Step modal (add/edit) -->
+<div class="overlay" id="step-overlay">
+  <div class="modal">
+    <button class="close-x" id="step-close">✕</button>
+    <h3 id="step-modal-title">Add step</h3>
+    <div class="field"><label>Step name *</label><input type="text" id="stf-name" placeholder="e.g. Wireframes"></div>
+    <div class="field"><label>Description</label><textarea id="stf-description" placeholder="What needs to happen…"></textarea></div>
+    <div class="row2">
+      <div class="field"><label>Start date</label><input type="date" id="stf-startDate"></div>
+      <div class="field"><label>End date</label><input type="date" id="stf-endDate"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Status</label>
+        <select id="stf-status">
+          <option>Not Started</option><option>In Progress</option><option>Submitted</option>
+          <option>Approved</option><option>Blocked</option>
+        </select>
+      </div>
+      <div class="field"><label>Assigned to</label><input type="text" id="stf-assignedStudent" list="student-list" placeholder="Optional"></div>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="stf-notes" placeholder="Anything else worth noting…"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="btn-delete-step" style="display:none;">Delete</button>
+      <div class="right">
+        <button class="btn" id="step-cancel">Cancel</button>
+        <button class="btn btn-primary" id="btn-save-step">Save step</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Steps due on a day (Projects tab calendar) -->
+<div class="overlay" id="proj-day-overlay">
+  <div class="modal" style="max-width:460px;">
+    <button class="close-x" id="proj-day-close">✕</button>
+    <h3 id="proj-day-title">Steps due</h3>
+    <div id="proj-day-list"></div>
+    <div class="modal-actions" style="justify-content:flex-end;">
+      <button class="btn" id="proj-day-done">Close</button>
     </div>
   </div>
 </div>
@@ -894,7 +1129,9 @@
 
   var SAMPLE = !CONFIG.API_URL;
   var state = { tasks: [], students: [], role: '', myName: '', selectedWeek: weekKey(new Date()), selectedMonth: todayMonth(), editingId: null, view: 'overview',
-    detailStudent: null, studentDetailFrom: 'overview' };
+    detailStudent: null, studentDetailFrom: 'overview',
+    projects: [], sprints: [], steps: [], detailProject: null, projectsCalMonth: todayMonth(),
+    editingProjectId: null, editingSprintId: null, editingStepId: null, stepSprintContext: null };
   /** True when signed in with a personal (student) passcode rather than the admin passphrase
    *  or sample/demo mode — the dashboard is scoped to just this one person's data. */
   function isPersonal(){ return !SAMPLE && state.role === 'member'; }
@@ -1069,6 +1306,7 @@
         state.role = json.role || state.role;
         state.myName = json.studentName || '';
         state.tasks = json.tasks || []; state.students = json.students || [];
+        state.projects = json.projects || []; state.sprints = json.sprints || []; state.steps = json.steps || [];
         updateRoleUI();
       } else if(isAuthError(json)){
         // The stored passphrase no longer works (e.g. it was changed
@@ -1216,6 +1454,8 @@
     safeRender(renderAllTasks);
     safeRender(renderStudentDatalist);
     if(state.view === 'student') safeRender(renderStudentDetail);
+    safeRender(renderProjectsTab);
+    if(state.view === 'project-detail') safeRender(renderProjectDetail);
   }
 
   function renderBanner(){
@@ -2531,6 +2771,9 @@
   var REPORT_STATUSES = ['Not Started','In Progress','Submitted','Approved','Blocked'];
   var REPORT_PRIORITIES = ['Low','Medium','High'];
 
+  var REPORT_FILTER_FIELD_IDS = ['rf-created-from','rf-created-to','rf-submitted-from','rf-submitted-to','rf-deadline-from','rf-deadline-to'];
+  var REPORT_CHIP_ROW_IDS = ['rf-students','rf-status','rf-priority'];
+
   function renderChipRow(containerId, values){
     var el = document.getElementById(containerId);
     el.innerHTML = values.map(function(v){
@@ -2538,7 +2781,7 @@
     }).join('');
     el.querySelectorAll('.chip-check').forEach(function(chip){
       var input = chip.querySelector('input');
-      input.addEventListener('change', function(){ chip.classList.toggle('checked', input.checked); });
+      input.addEventListener('change', function(){ chip.classList.toggle('checked', input.checked); updateReportFilterCount(); });
     });
   }
   function checkedChipValues(containerId){
@@ -2546,14 +2789,51 @@
     document.querySelectorAll('#'+containerId+' input:checked').forEach(function(inp){ out.push(inp.value); });
     return out;
   }
+  /** How many of the report's filter groups are actively narrowing results right
+   *  now (a date-range field counts once it has either end set; a chip row
+   *  counts only when it's a partial selection — all-checked or all-unchecked
+   *  both mean "no filter," matching how the empty-means-everything rule reads
+   *  in the intro copy above). Shown next to "Task filters" so it's obvious at
+   *  a glance whether the next click will narrow the download or not. */
+  function updateReportFilterCount(){
+    var n = 0;
+    if(document.getElementById('rf-created-from').value || document.getElementById('rf-created-to').value) n++;
+    if(document.getElementById('rf-submitted-from').value || document.getElementById('rf-submitted-to').value) n++;
+    if(document.getElementById('rf-deadline-from').value || document.getElementById('rf-deadline-to').value) n++;
+    REPORT_CHIP_ROW_IDS.forEach(function(id){
+      var total = document.querySelectorAll('#'+id+' input').length;
+      var checked = checkedChipValues(id).length;
+      if(checked > 0 && checked < total) n++;
+    });
+    var el = document.getElementById('rf-filter-count');
+    el.textContent = n ? n + ' filter' + (n===1?'':'s') + ' active' : 'No filters — includes everything';
+  }
+  function setAllChips(containerId, checked){
+    document.querySelectorAll('#'+containerId+' .chip-check').forEach(function(chip){
+      var input = chip.querySelector('input');
+      input.checked = checked;
+      chip.classList.toggle('checked', checked);
+    });
+    updateReportFilterCount();
+  }
+  document.querySelectorAll('[data-chip-all]').forEach(function(btn){
+    btn.addEventListener('click', function(){ setAllChips(btn.getAttribute('data-chip-all'), true); });
+  });
+  document.querySelectorAll('[data-chip-none]').forEach(function(btn){
+    btn.addEventListener('click', function(){ setAllChips(btn.getAttribute('data-chip-none'), false); });
+  });
+  REPORT_FILTER_FIELD_IDS.forEach(function(id){
+    document.getElementById(id).addEventListener('change', updateReportFilterCount);
+  });
   function openReportModal(){
     if(!CONFIG.API_URL){ showToast('Connect your Google Sheet first (⚙ Settings) to generate a report.'); return; }
-    ['rf-created-from','rf-created-to','rf-submitted-from','rf-submitted-to','rf-deadline-from','rf-deadline-to'].forEach(function(id){
+    REPORT_FILTER_FIELD_IDS.forEach(function(id){
       document.getElementById(id).value = '';
     });
     renderChipRow('rf-students', studentNames());
     renderChipRow('rf-status', REPORT_STATUSES);
     renderChipRow('rf-priority', REPORT_PRIORITIES);
+    updateReportFilterCount();
     setReportStatus('', '');
     reportOverlay.classList.add('show');
   }
@@ -2614,47 +2894,75 @@
 
   /* ---------- weekly review modal ---------- */
   var wrOverlay = document.getElementById('wr-overlay');
-  var wrManualCheck = document.getElementById('wr-manual-check');
-  var wrManualFields = document.getElementById('wr-manual-fields');
   function setWrStatus(msg, kind){
     var el = document.getElementById('wr-status');
     el.textContent = msg || '';
     el.className = 'report-status' + (kind ? ' is-'+kind : '');
   }
+  /** Mirrors Code.gs's workWeekBounds_() exactly (Sun–Thu work week; a report run
+   *  on a Fri/Sat rolls "this week" forward to the upcoming Sun–Thu rather than
+   *  the one that just ended) so the modal can show, before generating anything,
+   *  precisely which two date ranges the deck will use. Uses the same addDaysIso/
+   *  toISODate helpers the Projects Gantt view relies on — hoisted, so available
+   *  here even though they're defined later in this file. */
+  function computeWorkWeekBounds(today){
+    var dow = today.getDay(); // 0=Sun..6=Sat
+    var todayIso = toISODate(today);
+    var mostRecentSunday = addDaysIso(todayIso, -dow);
+    var thisStart = (dow===5||dow===6) ? addDaysIso(mostRecentSunday,7) : mostRecentSunday;
+    var thisEnd = addDaysIso(thisStart,4);
+    var lastStart = addDaysIso(thisStart,-7);
+    var lastEnd = addDaysIso(lastStart,4);
+    return { thisStart: thisStart, thisEnd: thisEnd, lastStart: lastStart, lastEnd: lastEnd };
+  }
+  function renderWrBoundsPreview(bounds){
+    document.getElementById('wr-bounds-preview').innerHTML =
+      '<div class="wrb-col"><span class="wrb-label">Last week</span><span class="wrb-dates">'+fmtDateShort(bounds.lastStart)+' – '+fmtDateShort(bounds.lastEnd)+'</span></div>'+
+      '<div class="wrb-col"><span class="wrb-label">This week</span><span class="wrb-dates">'+fmtDateShort(bounds.thisStart)+' – '+fmtDateShort(bounds.thisEnd)+'</span></div>';
+  }
   function openWrModal(){
     if(!CONFIG.API_URL){ showToast('Connect your Google Sheet first (⚙ Settings) to build the Weekly Review.'); return; }
+    var auto = computeWorkWeekBounds(new Date());
+    renderWrBoundsPreview(auto);
+    document.getElementById('wr-manual-check').checked = false;
+    document.getElementById('wr-manual-fields').classList.remove('show');
+    document.getElementById('wr-bounds-preview').style.display = '';
+    document.getElementById('wr-lastStart').value = auto.lastStart;
+    document.getElementById('wr-lastEnd').value = auto.lastEnd;
+    document.getElementById('wr-thisStart').value = auto.thisStart;
+    document.getElementById('wr-thisEnd').value = auto.thisEnd;
     setWrStatus('', '');
     wrOverlay.classList.add('show');
   }
   function closeWrModal(){ wrOverlay.classList.remove('show'); }
-  wrManualCheck.addEventListener('change', function(){
-    wrManualFields.style.display = wrManualCheck.checked ? '' : 'none';
+  document.getElementById('wr-manual-check').addEventListener('change', function(e){
+    document.getElementById('wr-manual-fields').classList.toggle('show', e.target.checked);
+    document.getElementById('wr-bounds-preview').style.display = e.target.checked ? 'none' : '';
   });
-  /** Reads the four manual date fields when the "choose dates manually" box is
-   *  checked. Returns {bounds} on success, or {error} if the box is checked
-   *  but the fields aren't validly filled in — checked client-side first so a
-   *  typo doesn't cost a round trip, though Code.gs validates again either way. */
-  function readWrBounds(){
-    if(!wrManualCheck.checked) return {bounds: null};
-    var lastStart = document.getElementById('wr-last-start').value;
-    var lastEnd = document.getElementById('wr-last-end').value;
-    var thisStart = document.getElementById('wr-this-start').value;
-    var thisEnd = document.getElementById('wr-this-end').value;
-    if(!lastStart || !lastEnd || !thisStart || !thisEnd){
-      return {error: 'Fill in all four manual dates, or uncheck the box to use the automatic work week.'};
-    }
-    if(lastStart > lastEnd) return {error: 'Previous week: start date is after the end date.'};
-    if(thisStart > thisEnd) return {error: 'Upcoming week: start date is after the end date.'};
-    return {bounds: {lastStart:lastStart, lastEnd:lastEnd, thisStart:thisStart, thisEnd:thisEnd}};
+  function collectWrManualBounds(){
+    return {
+      lastStart: document.getElementById('wr-lastStart').value,
+      lastEnd: document.getElementById('wr-lastEnd').value,
+      thisStart: document.getElementById('wr-thisStart').value,
+      thisEnd: document.getElementById('wr-thisEnd').value
+    };
   }
   function generateWeeklyReview(){
     if(SAMPLE){ showToast('Connect your Google Sheet first (⚙ Settings) — the Weekly Review is built server-side from the real data.'); return; }
-    var wr = readWrBounds();
-    if(wr.error){ setWrStatus(wr.error, 'error'); return; }
+    var manual = document.getElementById('wr-manual-check').checked;
+    var bounds = null;
+    if(manual){
+      bounds = collectWrManualBounds();
+      if(!bounds.lastStart || !bounds.lastEnd || !bounds.thisStart || !bounds.thisEnd){
+        setWrStatus('Fill in all four dates, or turn off "Choose these dates manually."', 'error'); return;
+      }
+      if(bounds.lastStart > bounds.lastEnd){ setWrStatus('Previous week: start date is after the end date.', 'error'); return; }
+      if(bounds.thisStart > bounds.thisEnd){ setWrStatus('Upcoming week: start date is after the end date.', 'error'); return; }
+    }
     var btn = document.getElementById('btn-generate-wr');
     btn.disabled = true;
     setWrStatus('Building the deck — this can take a few seconds…', 'busy');
-    apiCall('generateWeeklyReview', {bounds: wr.bounds}).then(function(res){
+    apiCall('generateWeeklyReview', manual ? {bounds: bounds} : {}).then(function(res){
       btn.disabled = false;
       if(!res || res.ok===false){
         setWrStatus((res && res.error) || 'Weekly Review generation failed.', 'error');
@@ -2672,6 +2980,472 @@
   document.getElementById('wr-cancel').addEventListener('click', closeWrModal);
   wrOverlay.addEventListener('click', function(e){ if(e.target===wrOverlay) closeWrModal(); });
   document.getElementById('btn-generate-wr').addEventListener('click', generateWeeklyReview);
+
+  /* ================= PROJECTS TAB (Projects -> Sprints -> Steps) ================= */
+  // A separate, team-wide planning/timeline structure alongside the existing per-student
+  // task tracker above — see the matching comment in Code.gs. Read access is unrestricted
+  // for every signed-in role (same deliberate exception as Report/Weekly Review); writes
+  // (add/update/delete project, sprint, or step) are admin-only, enforced both here (hiding
+  // the controls) and again server-side in Code.gs regardless of what the client sends.
+
+  function projectById(id){ return state.projects.find(function(p){ return p.id===id; }); }
+  function sprintById(id){ return state.sprints.find(function(s){ return s.id===id; }); }
+  function projectName(id){ var p = projectById(id); return p ? p.name : '(deleted project)'; }
+  /** Assigns each project a fixed categorical color by its creation order (sheet row order) —
+   *  same SERIES ramp used for student avatars. Wraps past 8 projects rather than the dataviz
+   *  skill's usual "fold into Other" rule, since every project here is its own identity that
+   *  still needs to stay visually distinguishable, not a long-tail category to collapse. */
+  function projectColorVar(id){
+    var idx = state.projects.findIndex(function(p){ return p.id===id; });
+    return idx===-1 ? null : SERIES[idx % SERIES.length];
+  }
+  function projectColor(id){ var v = projectColorVar(id); return v ? 'var('+v+')' : 'var(--text-muted)'; }
+  function stepsForProject(id){ return state.steps.filter(function(s){ return s.projectId===id; }); }
+  function sprintsForProject(id){
+    return state.sprints.filter(function(s){ return s.projectId===id; })
+      .sort(function(a,b){ return (a.startDate||'').localeCompare(b.startDate||'') || (a.createdAt||'').localeCompare(b.createdAt||''); });
+  }
+  function stepsForSprint(id){
+    return state.steps.filter(function(s){ return s.sprintId===id; })
+      .sort(function(a,b){ return (a.startDate||'').localeCompare(b.startDate||''); });
+  }
+  // Reuses the exact same 5-value status vocabulary as Tasks (Not Started/In Progress/
+  // Submitted/Approved/Blocked) — see STEP_HEADERS in Code.gs — so these colors are the
+  // one place a step's status maps to a color, shared by the calendar dots, pie legend
+  // tooltips, and every Gantt bar.
+  var STEP_STATUS_COLORS = {
+    'Not Started': 'var(--text-muted)', 'In Progress': 'var(--status-info)',
+    'Submitted': 'var(--series-1)', 'Approved': 'var(--status-good)', 'Blocked': 'var(--status-critical)'
+  };
+  function stepStatusColor(status){ return STEP_STATUS_COLORS[status] || STEP_STATUS_COLORS['Not Started']; }
+  function addDaysIso(iso, n){ var d = parseDate(iso); if(!d) return iso; d.setDate(d.getDate()+n); return toISODate(d); }
+  function daysBetweenIso(a, b){ var da = parseDate(a), db = parseDate(b); return (!da||!db) ? 0 : Math.round((db-da)/86400000); }
+  function fmtDateShort(iso){ var d = parseDate(iso); return d ? d.toLocaleDateString(undefined,{month:'short',day:'numeric'}) : ''; }
+
+  /* ---------- Projects tab: project cards + steps-by-project pie + all-steps calendar ---------- */
+  function renderProjectsTab(){
+    document.getElementById('btn-add-project').style.display = isAdmin() ? '' : 'none';
+    renderProjectCards();
+    renderProjectsPie();
+    renderProjectsCalendar();
+  }
+  function renderProjectCards(){
+    var el = document.getElementById('project-grid');
+    if(!state.projects.length){
+      el.innerHTML = '<div class="project-empty">No projects yet'+(isAdmin() ? ' — click "+ Add Project" above to create one.' : '.')+'</div>';
+      return;
+    }
+    el.innerHTML = state.projects.map(function(p){
+      var steps = stepsForProject(p.id), sprints = sprintsForProject(p.id);
+      var done = steps.filter(function(s){ return s.status==='Submitted'||s.status==='Approved'; }).length;
+      return '<div class="project-card" data-id="'+esc(p.id)+'" tabindex="0" role="button" aria-label="Open '+esc(p.name)+'">'+
+        '<div class="project-card-top"><span class="project-dot" style="background:'+projectColor(p.id)+'"></span>'+
+        '<span class="project-card-name">'+esc(p.name)+'</span></div>'+
+        '<div class="project-card-desc">'+esc(p.description||'No description yet.')+'</div>'+
+        '<div class="project-card-stats"><span><b>'+sprints.length+'</b> sprint'+(sprints.length===1?'':'s')+'</span>'+
+        '<span><b>'+steps.length+'</b> step'+(steps.length===1?'':'s')+'</span>'+
+        '<span><b>'+done+'</b> done</span></div>'+
+        '</div>';
+    }).join('');
+    el.querySelectorAll('[data-id]').forEach(function(card){
+      card.addEventListener('click', function(){ openProjectDetail(card.getAttribute('data-id')); });
+      card.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openProjectDetail(card.getAttribute('data-id')); } });
+    });
+  }
+  /** Steps-by-project donut — exact same arc-drawing technique as renderDonut(), keyed by
+   *  project instead of status bucket, using each project's categorical SERIES color. */
+  function renderProjectsPie(){
+    var wrap = document.getElementById('proj-pie');
+    var total = state.steps.length;
+    var r = 40, cx = 50, cy = 50, circumference = 2*Math.PI*r, gap = total ? 3 : 0;
+    var offset = 0;
+    var svgParts = [];
+    if(!total || !state.projects.length){
+      svgParts.push('<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="var(--gridline)" stroke-width="14"/>');
+    } else {
+      state.projects.forEach(function(p){
+        var n = stepsForProject(p.id).length;
+        if(!n) return;
+        var len = (n/total) * circumference - gap;
+        if(len < 0) len = 0;
+        svgParts.push('<circle class="donut-seg" data-tip="'+esc(p.name)+': '+n+' step'+(n===1?'':'s')+' ('+Math.round(100*n/total)+'%)" '+
+          'cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+projectColor(p.id)+'" stroke-width="14" '+
+          'stroke-dasharray="'+len+' '+(circumference-len)+'" stroke-dashoffset="'+(-offset)+'" stroke-linecap="round"/>');
+        offset += (n/total) * circumference;
+      });
+    }
+    wrap.innerHTML = '<svg class="donut-svg" viewBox="0 0 100 100">'+svgParts.join('')+'</svg>'+
+      '<div class="donut-center"><div class="donut-num">'+total+'</div><div class="donut-lbl">total steps</div></div>';
+    bindTooltips(wrap);
+    document.getElementById('proj-pie-legend').innerHTML = state.projects.length ? state.projects.map(function(p){
+      return '<span class="donut-legend-item"><i class="dot" style="background:'+projectColor(p.id)+'"></i>'+esc(p.name)+'<b>'+stepsForProject(p.id).length+'</b></span>';
+    }).join('') : '<span class="muted" style="font-size:12.5px;">No projects yet.</span>';
+  }
+  /** Cross-project month calendar of every step's due date (endDate) — exact same grid-building
+   *  technique as renderMonthlyCalendar(), with dots colored by project instead of by urgency. */
+  function renderProjectsCalendar(){
+    var first = new Date(state.projectsCalMonth+'-01T00:00:00');
+    var gridStart = new Date(first); gridStart.setDate(gridStart.getDate() - gridStart.getDay());
+    var days = [];
+    for(var i=0;i<42;i++){ var d = new Date(gridStart); d.setDate(gridStart.getDate()+i); days.push(d); }
+    while(days.length > 35){
+      var lastWeek = days.slice(days.length-7);
+      var allOutside = lastWeek.every(function(dd){ return dd.getMonth() !== first.getMonth(); });
+      if(allOutside) days = days.slice(0, days.length-7); else break;
+    }
+    var todayIso = todayISO();
+    var dowLbls = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var header = dowLbls.map(function(l){ return '<div class="cal-dow">'+l+'</div>'; }).join('');
+    var cells = days.map(function(d){
+      var iso = toISODate(d);
+      var outside = d.getMonth() !== first.getMonth();
+      var isToday = iso === todayIso;
+      var daySteps = state.steps.filter(function(s){ return s.endDate===iso; });
+      var dots = daySteps.slice(0,8).map(function(s){
+        return '<span class="cal-dot" style="background:'+projectColor(s.projectId)+'"></span>';
+      }).join('');
+      var overflow = daySteps.length > 8 ? '<span class="cal-more">+'+(daySteps.length-8)+'</span>' : '';
+      var tip = d.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'}) +
+        (daySteps.length ? ': ' + daySteps.length + ' step'+(daySteps.length===1?'':'s')+' due — click for details' : ': no steps due');
+      return '<div class="cal-day'+(outside?' cal-outside':'')+(isToday?' cal-today':'')+(daySteps.length?' cal-has-tasks':'')+'" '+
+        'data-tip="'+esc(tip)+'" data-day="'+iso+'" tabindex="0" role="button" aria-label="'+esc(tip)+'">'+
+        '<div class="cal-daynum">'+d.getDate()+'</div>'+
+        '<div class="cal-dots">'+dots+overflow+'</div>'+
+        '</div>';
+    }).join('');
+    var el = document.getElementById('proj-calendar');
+    el.innerHTML = header + cells;
+    bindTooltips(el);
+    document.getElementById('proj-cal-label').textContent = first.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+    document.getElementById('proj-cal-today').toggleAttribute('hidden', state.projectsCalMonth === todayMonth());
+    el.querySelectorAll('[data-day]').forEach(function(cell){
+      cell.addEventListener('click', function(){ openProjDayDetail(cell.getAttribute('data-day')); });
+      cell.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openProjDayDetail(cell.getAttribute('data-day')); } });
+    });
+  }
+  document.getElementById('proj-cal-prev').addEventListener('click', function(){ state.projectsCalMonth = shiftMonth(state.projectsCalMonth,-1); renderProjectsCalendar(); });
+  document.getElementById('proj-cal-next').addEventListener('click', function(){ state.projectsCalMonth = shiftMonth(state.projectsCalMonth,1); renderProjectsCalendar(); });
+  document.getElementById('proj-cal-today').addEventListener('click', function(){ state.projectsCalMonth = todayMonth(); renderProjectsCalendar(); });
+
+  var projDayOverlay = document.getElementById('proj-day-overlay');
+  function openProjDayDetail(iso){
+    if(!iso) return;
+    var d = parseDate(iso);
+    document.getElementById('proj-day-title').textContent = d ? d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}) : iso;
+    var daySteps = state.steps.filter(function(s){ return s.endDate===iso; })
+      .sort(function(a,b){ return projectName(a.projectId).localeCompare(projectName(b.projectId)); });
+    var list = document.getElementById('proj-day-list');
+    if(!daySteps.length){
+      list.innerHTML = '<div class="muted" style="padding:14px 4px;">No steps due this day.</div>';
+    } else {
+      list.innerHTML = daySteps.map(function(s){
+        return '<div class="day-task-row" data-pid="'+esc(s.projectId)+'">'+
+          '<span class="project-dot" style="background:'+projectColor(s.projectId)+';width:20px;height:20px;flex-shrink:0;"></span>'+
+          '<div class="day-task-main"><div class="day-task-name">'+esc(s.name||'(untitled step)')+'</div>'+
+          '<div class="day-task-student">'+esc(projectName(s.projectId))+(s.assignedStudent?' · '+esc(s.assignedStudent):'')+'</div></div>'+
+          '<span class="badge"><i class="dot" style="background:'+stepStatusColor(s.status)+'"></i>'+esc(s.status||'Not Started')+'</span>'+
+          '</div>';
+      }).join('');
+      list.querySelectorAll('[data-pid]').forEach(function(row){
+        row.addEventListener('click', function(){ closeProjDayDetail(); openProjectDetail(row.getAttribute('data-pid')); });
+      });
+    }
+    projDayOverlay.classList.add('show');
+  }
+  function closeProjDayDetail(){ projDayOverlay.classList.remove('show'); }
+  document.getElementById('proj-day-close').addEventListener('click', closeProjDayDetail);
+  document.getElementById('proj-day-done').addEventListener('click', closeProjDayDetail);
+  projDayOverlay.addEventListener('click', function(e){ if(e.target===projDayOverlay) closeProjDayDetail(); });
+
+  /* ---------- Project detail (Gantt timeline drill-down) ---------- */
+  function openProjectDetail(id){
+    if(!id || !projectById(id)) return;
+    state.detailProject = id;
+    switchView('project-detail');
+    renderProjectDetail();
+  }
+  document.getElementById('btn-project-back').addEventListener('click', function(){ switchView('projects'); });
+  function renderProjectDetail(){
+    var id = state.detailProject;
+    var p = projectById(id);
+    if(!p){ switchView('projects'); return; }
+    document.getElementById('pd-dot').style.background = projectColor(id);
+    document.getElementById('pd-name').textContent = p.name;
+    document.getElementById('pd-desc').textContent = p.description || '';
+    document.getElementById('pd-notes').textContent = p.notes || 'No notes.';
+    var admin = isAdmin();
+    document.getElementById('pd-actions').style.display = admin ? '' : 'none';
+    document.getElementById('btn-add-sprint').style.display = admin ? '' : 'none';
+    renderGantt(id);
+  }
+
+  /** Renders the project's Gantt: one dashed outline bar per sprint (spanning its own
+   *  start–end) with its steps as colored sub-rows underneath, all sharing one date axis
+   *  (week tick marks + a dashed "today" line) computed from the earliest/latest date
+   *  across every sprint and step in the project, padded a few days on each side. */
+  var GANTT_DAY_PX = 26, GANTT_LABEL_PX = 220;
+  function renderGantt(projectId){
+    var sprints = sprintsForProject(projectId);
+    var wrap = document.getElementById('pd-gantt');
+    var admin = isAdmin();
+    if(!sprints.length){
+      wrap.innerHTML = '<div class="project-empty">No sprints yet'+(admin ? ' — click "+ Add Sprint" above to start the timeline.' : '.')+'</div>';
+      return;
+    }
+    var dates = [todayISO()];
+    sprints.forEach(function(sp){
+      if(sp.startDate) dates.push(sp.startDate);
+      if(sp.endDate) dates.push(sp.endDate);
+      stepsForSprint(sp.id).forEach(function(st){
+        if(st.startDate) dates.push(st.startDate);
+        if(st.endDate) dates.push(st.endDate);
+      });
+    });
+    var minD = dates.reduce(function(a,b){ return b<a?b:a; });
+    var maxD = dates.reduce(function(a,b){ return b>a?b:a; });
+    var rangeStart = addDaysIso(minD, -3);
+    var totalDays = Math.max(7, daysBetweenIso(rangeStart, addDaysIso(maxD, 3)) + 1);
+    var totalPx = totalDays * GANTT_DAY_PX;
+    function offsetPx(iso){ return daysBetweenIso(rangeStart, iso) * GANTT_DAY_PX; }
+    var todayPx = offsetPx(todayISO());
+    var todayLine = '<div class="gantt-today" style="left:'+todayPx+'px;" data-tip="Today"></div>';
+
+    var ticks = [];
+    for(var off=0; off<=totalDays; off+=7){
+      var tIso = addDaysIso(rangeStart, off);
+      ticks.push('<div class="gantt-tick" style="left:'+(off*GANTT_DAY_PX)+'px;">'+fmtDateShort(tIso)+'</div>');
+    }
+
+    var rowsHtml = [];
+    sprints.forEach(function(sp){
+      var spStart = sp.startDate, spEnd = sp.endDate || sp.startDate;
+      var spBar = (spStart && spEnd) ?
+        '<div class="gantt-bar is-sprint-bar" style="left:'+offsetPx(spStart)+'px;width:'+Math.max(GANTT_DAY_PX,(daysBetweenIso(spStart,spEnd)+1)*GANTT_DAY_PX)+'px;" '+
+        'data-tip="'+esc(sp.name)+': '+fmtDateShort(spStart)+' – '+fmtDateShort(spEnd)+'"></div>' : '';
+      rowsHtml.push('<div class="gantt-row is-sprint">'+
+        '<div class="gantt-label is-sprint" data-edit-sprint="'+esc(sp.id)+'"><div class="sprint-group-head">'+
+        '<span class="gantt-label-name" data-tip="'+esc(sp.name)+'">'+esc(sp.name)+'</span>'+
+        (admin ? '<span class="sprint-group-actions"><button class="icon-btn" data-add-step="'+esc(sp.id)+'" data-tip="Add step to this sprint">+ step</button></span>' : '')+
+        '</div></div>'+
+        '<div class="gantt-track" style="width:'+totalPx+'px;">'+spBar+todayLine+'</div>'+
+        '</div>');
+      stepsForSprint(sp.id).forEach(function(st){
+        var stStart = st.startDate, stEnd = st.endDate || st.startDate;
+        var bar = '';
+        if(stStart && stEnd){
+          var left = offsetPx(stStart), w = Math.max(GANTT_DAY_PX, (daysBetweenIso(stStart,stEnd)+1)*GANTT_DAY_PX);
+          var label = w > 56 ? '<span class="gantt-bar-label">'+esc(st.name)+'</span>' : '';
+          var tip = esc(st.name)+' · '+esc(st.status||'Not Started')+(st.assignedStudent?' · '+esc(st.assignedStudent):'')+' · '+fmtDateShort(stStart)+' – '+fmtDateShort(stEnd);
+          bar = '<div class="gantt-bar" data-edit-step="'+esc(st.id)+'" style="left:'+left+'px;width:'+w+'px;background:'+stepStatusColor(st.status)+';" data-tip="'+tip+'">'+label+'</div>';
+        }
+        rowsHtml.push('<div class="gantt-row is-step">'+
+          '<div class="gantt-label is-step" data-edit-step="'+esc(st.id)+'"><span class="gantt-label-name" data-tip="'+esc(st.name)+'">'+esc(st.name)+'</span></div>'+
+          '<div class="gantt-track" style="width:'+totalPx+'px;">'+bar+todayLine+'</div>'+
+          '</div>');
+      });
+    });
+
+    wrap.innerHTML =
+      '<div class="gantt-header"><div class="gantt-label"></div><div class="gantt-ticks" style="width:'+totalPx+'px;">'+ticks.join('')+todayLine+'</div></div>'+
+      '<div class="gantt-body">'+rowsHtml.join('')+'</div>';
+    bindTooltips(wrap);
+    wrap.querySelectorAll('[data-edit-sprint]').forEach(function(el){
+      el.addEventListener('click', function(e){ if(e.target.closest('[data-add-step]')) return; openSprintModal(el.getAttribute('data-edit-sprint')); });
+    });
+    wrap.querySelectorAll('[data-add-step]').forEach(function(btn){
+      btn.addEventListener('click', function(e){ e.stopPropagation(); openStepModal(null, btn.getAttribute('data-add-step')); });
+    });
+    wrap.querySelectorAll('[data-edit-step]').forEach(function(el){
+      el.addEventListener('click', function(){ openStepModal(el.getAttribute('data-edit-step')); });
+    });
+  }
+
+  /* ---------- Project modal (add/edit) ---------- */
+  var projectOverlay = document.getElementById('project-overlay');
+  function openProjectModal(id){
+    state.editingProjectId = id || null;
+    var p = id ? projectById(id) : null;
+    document.getElementById('project-modal-title').textContent = p ? 'Edit project' : 'Add project';
+    document.getElementById('pf-name').value = p ? p.name||'' : '';
+    document.getElementById('pf-description').value = p ? p.description||'' : '';
+    document.getElementById('pf-notes').value = p ? p.notes||'' : '';
+    projectOverlay.classList.add('show');
+  }
+  function closeProjectModal(){ projectOverlay.classList.remove('show'); }
+  document.getElementById('btn-add-project').addEventListener('click', function(){ openProjectModal(null); });
+  document.getElementById('btn-edit-project').addEventListener('click', function(){ openProjectModal(state.detailProject); });
+  document.getElementById('project-close').addEventListener('click', closeProjectModal);
+  document.getElementById('project-cancel').addEventListener('click', closeProjectModal);
+  projectOverlay.addEventListener('click', function(e){ if(e.target===projectOverlay) closeProjectModal(); });
+  document.getElementById('btn-save-project').addEventListener('click', function(){
+    var name = document.getElementById('pf-name').value.trim();
+    if(!name){ showToast('Project name is required.'); return; }
+    var data = { name: name, description: document.getElementById('pf-description').value, notes: document.getElementById('pf-notes').value };
+    var isEdit = !!state.editingProjectId;
+    if(SAMPLE){
+      var now = new Date().toISOString();
+      if(isEdit){ Object.assign(projectById(state.editingProjectId), data, {updatedAt: now}); }
+      else { data.id = 'local-'+Date.now(); data.createdAt = now; data.updatedAt = now; state.projects.push(data); }
+      renderProjectsTab(); if(isEdit) renderProjectDetail();
+      closeProjectModal(); showToast('Saved (sample mode — connect Settings to persist for real).');
+      return;
+    }
+    var promise = isEdit ? apiCall('updateProject', {id: state.editingProjectId, data:data}) : apiCall('addProject', {data:data});
+    promise.then(function(res){
+      if(!res || res.ok===false){ showToast('Save failed: ' + (res&&res.error||'unknown error')); return; }
+      closeProjectModal();
+      fetchTasks().then(function(){
+        renderProjectsTab();
+        if(isEdit) renderProjectDetail();
+        else if(res.id) openProjectDetail(res.id);
+      });
+    }).catch(function(){ showToast('Could not reach the sheet — check Settings and try again.'); });
+  });
+  document.getElementById('btn-delete-project').addEventListener('click', function(){
+    var id = state.detailProject; var p = projectById(id);
+    if(!p) return;
+    if(!confirm('Delete "'+p.name+'"? This also deletes every sprint and step inside it. This can\'t be undone.')) return;
+    if(SAMPLE){
+      state.projects = state.projects.filter(function(x){ return x.id!==id; });
+      state.sprints = state.sprints.filter(function(x){ return x.projectId!==id; });
+      state.steps = state.steps.filter(function(x){ return x.projectId!==id; });
+      switchView('projects'); renderProjectsTab();
+      showToast('Deleted (sample mode).');
+      return;
+    }
+    apiCall('deleteProject', {id:id}).then(function(res){
+      if(!res || res.ok===false){ showToast('Delete failed.'); return; }
+      switchView('projects');
+      fetchTasks().then(renderProjectsTab);
+      showToast('Project deleted.');
+    }).catch(function(){ showToast('Could not reach the sheet — check Settings and try again.'); });
+  });
+
+  /* ---------- Sprint modal (add/edit) ---------- */
+  var sprintOverlay = document.getElementById('sprint-overlay');
+  function openSprintModal(id){
+    state.editingSprintId = id || null;
+    var sp = id ? sprintById(id) : null;
+    document.getElementById('sprint-modal-title').textContent = sp ? 'Edit sprint' : 'Add sprint';
+    document.getElementById('sf-name').value = sp ? sp.name||'' : '';
+    document.getElementById('sf-description').value = sp ? sp.description||'' : '';
+    document.getElementById('sf-startDate').value = sp ? sp.startDate||'' : todayISO();
+    document.getElementById('sf-endDate').value = sp ? sp.endDate||'' : '';
+    document.getElementById('sf-notes').value = sp ? sp.notes||'' : '';
+    document.getElementById('btn-delete-sprint').style.display = sp ? 'inline-flex' : 'none';
+    sprintOverlay.classList.add('show');
+  }
+  function closeSprintModal(){ sprintOverlay.classList.remove('show'); }
+  document.getElementById('btn-add-sprint').addEventListener('click', function(){ openSprintModal(null); });
+  document.getElementById('sprint-close').addEventListener('click', closeSprintModal);
+  document.getElementById('sprint-cancel').addEventListener('click', closeSprintModal);
+  sprintOverlay.addEventListener('click', function(e){ if(e.target===sprintOverlay) closeSprintModal(); });
+  document.getElementById('btn-save-sprint').addEventListener('click', function(){
+    var name = document.getElementById('sf-name').value.trim();
+    if(!name){ showToast('Sprint name is required.'); return; }
+    var startDate = document.getElementById('sf-startDate').value, endDate = document.getElementById('sf-endDate').value;
+    if(startDate && endDate && endDate < startDate){ showToast('Sprint end date is before its start date.'); return; }
+    var data = { projectId: state.detailProject, name: name, description: document.getElementById('sf-description').value,
+      startDate: startDate, endDate: endDate, notes: document.getElementById('sf-notes').value };
+    var isEdit = !!state.editingSprintId;
+    if(SAMPLE){
+      var now = new Date().toISOString();
+      if(isEdit){ Object.assign(sprintById(state.editingSprintId), data, {updatedAt: now}); }
+      else { data.id = 'local-'+Date.now(); data.createdAt = now; data.updatedAt = now; state.sprints.push(data); }
+      closeSprintModal(); renderProjectDetail(); renderProjectsTab();
+      showToast('Saved (sample mode — connect Settings to persist for real).');
+      return;
+    }
+    var promise = isEdit ? apiCall('updateSprint', {id: state.editingSprintId, data:data}) : apiCall('addSprint', {data:data});
+    promise.then(function(res){
+      if(!res || res.ok===false){ showToast('Save failed: ' + (res&&res.error||'unknown error')); return; }
+      closeSprintModal();
+      fetchTasks().then(function(){ renderProjectDetail(); renderProjectsTab(); });
+    }).catch(function(){ showToast('Could not reach the sheet — check Settings and try again.'); });
+  });
+  document.getElementById('btn-delete-sprint').addEventListener('click', function(){
+    var id = state.editingSprintId; var sp = sprintById(id);
+    if(!sp) return;
+    if(!confirm('Delete sprint "'+sp.name+'"? This also deletes every step inside it. This can\'t be undone.')) return;
+    if(SAMPLE){
+      state.sprints = state.sprints.filter(function(x){ return x.id!==id; });
+      state.steps = state.steps.filter(function(x){ return x.sprintId!==id; });
+      closeSprintModal(); renderProjectDetail(); renderProjectsTab();
+      showToast('Deleted (sample mode).');
+      return;
+    }
+    apiCall('deleteSprint', {id:id}).then(function(res){
+      if(!res || res.ok===false){ showToast('Delete failed.'); return; }
+      closeSprintModal();
+      fetchTasks().then(function(){ renderProjectDetail(); renderProjectsTab(); });
+      showToast('Sprint deleted.');
+    }).catch(function(){ showToast('Could not reach the sheet — check Settings and try again.'); });
+  });
+
+  /* ---------- Step modal (add/edit) ---------- */
+  var stepOverlay = document.getElementById('step-overlay');
+  function openStepModal(id, sprintIdForNew){
+    state.editingStepId = id || null;
+    state.stepSprintContext = id ? null : sprintIdForNew;
+    var st = id ? state.steps.find(function(x){return x.id===id;}) : null;
+    document.getElementById('step-modal-title').textContent = st ? 'Edit step' : 'Add step';
+    document.getElementById('stf-name').value = st ? st.name||'' : '';
+    document.getElementById('stf-description').value = st ? st.description||'' : '';
+    document.getElementById('stf-startDate').value = st ? st.startDate||'' : todayISO();
+    document.getElementById('stf-endDate').value = st ? st.endDate||'' : '';
+    document.getElementById('stf-status').value = st ? st.status||'Not Started' : 'Not Started';
+    document.getElementById('stf-assignedStudent').value = st ? st.assignedStudent||'' : '';
+    document.getElementById('stf-notes').value = st ? st.notes||'' : '';
+    document.getElementById('btn-delete-step').style.display = st ? 'inline-flex' : 'none';
+    stepOverlay.classList.add('show');
+  }
+  function closeStepModal(){ stepOverlay.classList.remove('show'); }
+  document.getElementById('step-close').addEventListener('click', closeStepModal);
+  document.getElementById('step-cancel').addEventListener('click', closeStepModal);
+  stepOverlay.addEventListener('click', function(e){ if(e.target===stepOverlay) closeStepModal(); });
+  document.getElementById('btn-save-step').addEventListener('click', function(){
+    var name = document.getElementById('stf-name').value.trim();
+    if(!name){ showToast('Step name is required.'); return; }
+    var startDate = document.getElementById('stf-startDate').value, endDate = document.getElementById('stf-endDate').value;
+    if(startDate && endDate && endDate < startDate){ showToast('Step end date is before its start date.'); return; }
+    var isEdit = !!state.editingStepId;
+    var sprintId = isEdit ? state.steps.find(function(x){return x.id===state.editingStepId;}).sprintId : state.stepSprintContext;
+    var data = { projectId: state.detailProject, sprintId: sprintId, name: name,
+      description: document.getElementById('stf-description').value, startDate: startDate, endDate: endDate,
+      status: document.getElementById('stf-status').value, assignedStudent: document.getElementById('stf-assignedStudent').value.trim(),
+      notes: document.getElementById('stf-notes').value };
+    if(SAMPLE){
+      var now = new Date().toISOString();
+      if(isEdit){ Object.assign(state.steps.find(function(x){return x.id===state.editingStepId;}), data, {updatedAt: now}); }
+      else { data.id = 'local-'+Date.now(); data.createdAt = now; data.updatedAt = now; state.steps.push(data); }
+      closeStepModal(); renderProjectDetail(); renderProjectsTab();
+      showToast('Saved (sample mode — connect Settings to persist for real).');
+      return;
+    }
+    var promise = isEdit ? apiCall('updateStep', {id: state.editingStepId, data:data}) : apiCall('addStep', {data:data});
+    promise.then(function(res){
+      if(!res || res.ok===false){ showToast('Save failed: ' + (res&&res.error||'unknown error')); return; }
+      closeStepModal();
+      fetchTasks().then(function(){ renderProjectDetail(); renderProjectsTab(); });
+    }).catch(function(){ showToast('Could not reach the sheet — check Settings and try again.'); });
+  });
+  document.getElementById('btn-delete-step').addEventListener('click', function(){
+    var id = state.editingStepId; var st = state.steps.find(function(x){return x.id===id;});
+    if(!st) return;
+    if(!confirm('Delete step "'+st.name+'"? This can\'t be undone.')) return;
+    if(SAMPLE){
+      state.steps = state.steps.filter(function(x){ return x.id!==id; });
+      closeStepModal(); renderProjectDetail(); renderProjectsTab();
+      showToast('Deleted (sample mode).');
+      return;
+    }
+    apiCall('deleteStep', {id:id}).then(function(res){
+      if(!res || res.ok===false){ showToast('Delete failed.'); return; }
+      closeStepModal();
+      fetchTasks().then(function(){ renderProjectDetail(); renderProjectsTab(); });
+      showToast('Step deleted.');
+    }).catch(function(){ showToast('Could not reach the sheet — check Settings and try again.'); });
+  });
 
   /* ---------- toast ---------- */
   var toastTimer;
