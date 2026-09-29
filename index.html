@@ -1420,6 +1420,11 @@
         state.role = json.role;
         state.myName = json.studentName || '';
         state.tasks = json.tasks || []; state.students = json.students || [];
+        // These three were missing here — fetchTasks() (used by Settings' "Save &
+        // connect") already populated them, but the actual sign-in path (this
+        // function) didn't, so Projects looked empty right after logging in until
+        // something else happened to call fetchTasks() and backfill them.
+        state.projects = json.projects || []; state.sprints = json.sprints || []; state.steps = json.steps || [];
         try{ localStorage.setItem(keyStorageName(), key); }catch(e){}
         hideGate();
         updateRoleUI();
