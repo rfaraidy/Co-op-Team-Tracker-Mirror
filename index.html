@@ -74,6 +74,7 @@
   .banner code{background:var(--page);padding:1px 5px;border-radius:4px;}
 
   .stat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px;}
+  .stat-row-4{grid-template-columns:repeat(4,1fr);}
   .stat-tile{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);padding:13px 14px;}
   .stat-tile .num{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1;}
   .stat-tile .lbl{font-size:11.5px;color:var(--text-secondary);margin-top:3px;}
@@ -443,22 +444,51 @@
   }
 
   /* ---------- Projects tab (Projects -> Sprints -> Steps) ---------- */
-  .project-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;}
+  .project-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}
   .project-card{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);
-    padding:16px;cursor:pointer;transition:transform .12s,border-color .12s;}
-  .project-card:hover{border-color:var(--series-1);transform:translateY(-1px);}
+    padding:16px;padding-top:14px;cursor:pointer;position:relative;overflow:hidden;
+    transition:transform .14s ease,border-color .14s ease,box-shadow .14s ease;}
+  .project-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent,var(--series-1));}
+  .project-card:hover{border-color:var(--accent,var(--series-1));transform:translateY(-2px);
+    box-shadow:0 10px 22px -12px rgba(0,0,0,.28);}
   .project-card:focus-visible{outline:2px solid var(--series-1);outline-offset:1px;}
-  .project-card-top{display:flex;align-items:center;gap:9px;margin-bottom:9px;}
+  .project-card-top{display:flex;align-items:center;gap:9px;margin:4px 0 9px;}
   .project-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;}
   .project-card-name{font-size:15px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .project-card-owner-row{margin:-4px 0 9px;}
   .project-card-desc{font-size:12.5px;color:var(--text-secondary);margin-bottom:12px;min-height:18px;
     overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+  .project-card-status{margin-bottom:12px;}
+  .project-card-progress{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+  .project-card-progress .track{flex:1;margin:0;}
+  .project-card-progress-pct{font-size:11.5px;font-weight:700;color:var(--text-secondary);font-variant-numeric:tabular-nums;white-space:nowrap;}
   .project-card-stats{display:flex;gap:14px;font-size:12px;color:var(--text-muted);}
   .project-card-stats b{color:var(--text-primary);font-weight:700;}
   .project-card-actions{display:flex;gap:6px;margin-top:12px;}
   .project-empty{padding:28px 10px;text-align:center;color:var(--text-muted);font-size:13px;}
   .project-owner-tag{flex-shrink:0;font-size:10.5px;font-weight:600;color:var(--text-muted);
     background:var(--page);border-radius:20px;padding:2px 9px;white-space:nowrap;}
+  .status-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;
+    padding:3.5px 9px 3.5px 7px;border-radius:20px;white-space:nowrap;}
+  .status-pill i{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+
+  /* Project list toolbar (search + sort) above the card grid — search box borrows the
+     Gantt toolbar's .gantt-search look for visual consistency across the tab. */
+  .project-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-bottom:14px;}
+  .project-toolbar select{border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12.5px;
+    background:var(--surface-1);color:var(--text-primary);cursor:pointer;margin-left:auto;}
+
+  /* Project detail header stats bar — a Monday-style "group summary" row: date span,
+     day count, sprint/step counts, and an overall progress meter, all in one glance. */
+  .pd-stats-bar{display:flex;flex-wrap:wrap;gap:12px 26px;align-items:center;margin-top:14px;padding:13px 16px;
+    background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);}
+  .pd-stat{display:flex;flex-direction:column;gap:2px;}
+  .pd-stat .pd-stat-num{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1;color:var(--text-primary);}
+  .pd-stat .pd-stat-lbl{font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;}
+  .pd-stats-progress{display:flex;align-items:center;gap:9px;flex:1 1 160px;min-width:140px;}
+  .pd-stats-progress .track{flex:1;margin:0;}
+  .pd-stats-progress-pct{font-size:12.5px;font-weight:700;color:var(--text-secondary);font-variant-numeric:tabular-nums;}
+  @media (max-width:760px){ .pd-stats-bar{gap:10px 18px;} }
 
   /* Gantt timeline (project detail) */
   .gantt-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-1);}
@@ -762,6 +792,8 @@
       <button class="btn btn-primary" id="btn-add-project">+ Add Project</button>
     </div>
 
+    <div class="stat-row stat-row-4" id="proj-stat-row" style="margin-bottom:22px;"></div>
+
     <div class="section-head" style="margin-top:4px;">
       <h2>All steps calendar</h2>
       <div class="nav-week">
@@ -805,6 +837,7 @@
     </div>
 
     <div class="section-head" style="margin-top:22px;"><h2>All projects</h2></div>
+    <div id="project-toolbar"></div>
     <div class="project-grid" id="project-grid"></div>
   </section>
 
@@ -823,7 +856,9 @@
       </div>
     </div>
 
-    <div class="section-head" style="margin-top:10px;">
+    <div class="pd-stats-bar" id="pd-stats-bar"></div>
+
+    <div class="section-head" style="margin-top:14px;">
       <h2>Timeline</h2>
       <button class="btn btn-primary" id="btn-add-sprint">+ Add Sprint</button>
     </div>
@@ -1222,6 +1257,8 @@
     projects: [], sprints: [], steps: [], detailProject: null, projectsCalMonth: todayMonth(),
     editingProjectId: null, editingSprintId: null, editingStepId: null, stepSprintContext: null,
     collapsedSprints: {}, collapsedProjects: {},
+    // Search/sort state for the "All projects" card grid (see renderProjectCards below).
+    projectsUi: { search: '', sort: 'name' },
     // Admin's combined timeline (renderAdminTimeline) has its own independent fold
     // state, deliberately separate from collapsedSprints/collapsedProjects above (which
     // belong to the per-project Gantt) so toggling one view never affects the other.
@@ -3250,6 +3287,43 @@
   function addDaysIso(iso, n){ var d = parseDate(iso); if(!d) return iso; d.setDate(d.getDate()+n); return toISODate(d); }
   function daysBetweenIso(a, b){ var da = parseDate(a), db = parseDate(b); return (!da||!db) ? 0 : Math.round((db-da)/86400000); }
   function fmtDateShort(iso){ var d = parseDate(iso); return d ? d.toLocaleDateString(undefined,{month:'short',day:'numeric'}) : ''; }
+  /** A quick "how's this project doing" read, used by both the card grid and the detail
+   *  page's stats bar — based purely on open (not Submitted/Approved) steps' due dates,
+   *  same 5-status vocabulary/colors as everywhere else in the app. */
+  function computeProjectStatus(p){
+    var steps = stepsForProject(p.id);
+    if(!steps.length) return { label:'No steps yet', color:'var(--text-muted)' };
+    var openSteps = steps.filter(function(s){ return s.status!=='Submitted' && s.status!=='Approved'; });
+    if(!openSteps.length) return { label:'Complete', color:'var(--status-good)' };
+    var today = todayISO();
+    var hasOverdue = openSteps.some(function(s){ return s.endDate && s.endDate < today; });
+    if(hasOverdue) return { label:'Overdue', color:'var(--status-critical)' };
+    var hasDueSoon = openSteps.some(function(s){ return s.endDate && s.endDate >= today && daysBetweenIso(today, s.endDate) <= 3; });
+    if(hasDueSoon) return { label:'Due soon', color:'var(--status-warning)' };
+    return { label:'On track', color:'var(--status-info)' };
+  }
+  function projectProgressPct_(p){
+    var steps = stepsForProject(p.id);
+    if(!steps.length) return 0;
+    var done = steps.filter(function(s){ return s.status==='Submitted'||s.status==='Approved'; }).length;
+    return Math.round(100*done/steps.length);
+  }
+  /** Earliest sprint start / latest sprint end for a project — used by the detail page's
+   *  Monday-style stats bar to show a project-level date span + day count at a glance. */
+  function projectDateRange(p){
+    var sprints = sprintsForProject(p.id);
+    var starts = sprints.map(function(s){ return s.startDate; }).filter(Boolean);
+    var ends = sprints.map(function(s){ return s.endDate; }).filter(Boolean);
+    if(!starts.length || !ends.length) return null;
+    var minStart = starts.reduce(function(a,b){ return b<a?b:a; });
+    var maxEnd = ends.reduce(function(a,b){ return b>a?b:a; });
+    return { start: minStart, end: maxEnd, days: daysBetweenIso(minStart, maxEnd) + 1 };
+  }
+  function projectSoonestOpenDeadline_(p){
+    var openSteps = stepsForProject(p.id).filter(function(s){ return s.status!=='Submitted' && s.status!=='Approved' && s.endDate; });
+    if(!openSteps.length) return null;
+    return openSteps.map(function(s){ return s.endDate; }).reduce(function(a,b){ return b<a?b:a; });
+  }
 
   /* ---------- Projects tab: project cards + steps-by-project pie + all-steps calendar ---------- */
   // Ownership model: any signed-in user (admin or member) can add a project of their own.
@@ -3261,36 +3335,130 @@
   // mine or I'm admin," none of the add/edit/delete controls need their own admin-only gate
   // anymore — the "+ Add Project" button and every per-project action are always shown.
   function renderProjectsTab(){
+    renderProjectsStats();
     renderProjectCards();
     renderProjectsPie();
     renderProjectsCalendar();
     document.getElementById('admin-timeline-panel').style.display = isAdmin() ? '' : 'none';
     if(isAdmin()) renderAdminTimeline();
   }
+  /** Quick-glance stat strip at the top of the Projects tab — active project count, plus
+   *  open/due-this-week/overdue steps as proportions (see statMeterTile), so the state of
+   *  everything in progress is visible before scrolling into the calendar or card grid. */
+  function renderProjectsStats(){
+    var el = document.getElementById('proj-stat-row');
+    var totalSteps = state.steps.length;
+    var openSteps = state.steps.filter(function(s){ return s.status!=='Submitted' && s.status!=='Approved'; });
+    var today = todayISO();
+    var overdue = openSteps.filter(function(s){ return s.endDate && s.endDate < today; });
+    var dueThisWeek = openSteps.filter(function(s){ return s.endDate && s.endDate >= today && daysBetweenIso(today, s.endDate) <= 7; });
+    el.innerHTML =
+      '<div class="stat-tile"><div class="num">'+state.projects.length+'</div><div class="lbl">'+(isPersonal()?'Your projects':'Active projects')+'</div></div>'+
+      statMeterTile({id:'proj-open-steps', noClick:true, num:openSteps.length, sub:'of '+totalSteps, lbl:'Open steps', pct: totalSteps?Math.round(100*openSteps.length/totalSteps):0, color:'var(--status-info)'})+
+      statMeterTile({id:'proj-due-week', noClick:true, num:dueThisWeek.length, sub:'of '+openSteps.length, lbl:'Due this week', pct: openSteps.length?Math.round(100*dueThisWeek.length/openSteps.length):0, color:'var(--status-warning)'})+
+      statMeterTile({id:'proj-overdue', noClick:true, num:overdue.length, sub:'of '+openSteps.length, lbl:'Overdue', pct: openSteps.length?Math.round(100*overdue.length/openSteps.length):0, color:'var(--status-critical)'});
+  }
+  /** Small search + sort toolbar above the card grid. Hand-rolled rather than reusing the
+   *  full Gantt toolbar machinery (no status/person filters needed here), but follows the
+   *  same ui.__focusSearch pattern so typing never loses input focus on re-render. */
+  function projectToolbarHtml_(ui){
+    return '<div class="project-toolbar">'+
+      '<div class="gantt-search" style="max-width:240px;">'+
+        '<span aria-hidden="true">&#128269;</span>'+
+        '<input type="text" placeholder="Search projects…" value="'+esc(ui.search)+'" data-proj-search />'+
+      '</div>'+
+      '<select data-proj-sort aria-label="Sort projects">'+
+        '<option value="name"'+(ui.sort==='name'?' selected':'')+'>Sort: Name (A–Z)</option>'+
+        '<option value="deadline"'+(ui.sort==='deadline'?' selected':'')+'>Sort: Soonest deadline</option>'+
+        '<option value="steps"'+(ui.sort==='steps'?' selected':'')+'>Sort: Most steps</option>'+
+        '<option value="progress"'+(ui.sort==='progress'?' selected':'')+'>Sort: Least complete</option>'+
+      '</select>'+
+      '</div>';
+  }
+  function bindProjectToolbar_(wrap, ui, onChange){
+    var searchInput = wrap.querySelector('[data-proj-search]');
+    if(searchInput){
+      searchInput.addEventListener('input', function(){
+        ui.search = searchInput.value;
+        ui.__focusSearch = true;
+        onChange();
+      });
+    }
+    var sortSelect = wrap.querySelector('[data-proj-sort]');
+    if(sortSelect){
+      sortSelect.addEventListener('change', function(){ ui.sort = sortSelect.value; onChange(); });
+    }
+    if(ui.__focusSearch){
+      ui.__focusSearch = false;
+      var fresh = wrap.querySelector('[data-proj-search]');
+      if(fresh){ fresh.focus(); var pos = fresh.value.length; fresh.setSelectionRange(pos, pos); }
+    }
+  }
   function renderProjectCards(){
-    var el = document.getElementById('project-grid');
+    var toolbarEl = document.getElementById('project-toolbar');
+    var gridEl = document.getElementById('project-grid');
+    var ui = state.projectsUi;
+
     if(!state.projects.length){
-      el.innerHTML = '<div class="project-empty">No projects yet — click "+ Add Project" above to create one.</div>';
+      toolbarEl.innerHTML = '';
+      gridEl.innerHTML = '<div class="project-empty">No projects yet — click "+ Add Project" above to create one.</div>';
       return;
     }
+
+    toolbarEl.innerHTML = projectToolbarHtml_(ui);
+    bindProjectToolbar_(toolbarEl, ui, renderProjectCards);
+
     // Admin sees every member's projects mixed together, so a small owner tag helps tell
     // them apart; a member only ever has their own, so the tag would be redundant there.
     var showOwner = isAdmin();
-    el.innerHTML = state.projects.map(function(p){
+    var q = (ui.search||'').trim().toLowerCase();
+    var visible = !q ? state.projects : state.projects.filter(function(p){
+      return (p.name||'').toLowerCase().indexOf(q) > -1 ||
+        (p.description||'').toLowerCase().indexOf(q) > -1 ||
+        (showOwner && (p.ownerName||'').toLowerCase().indexOf(q) > -1);
+    });
+
+    var sorted = visible.slice().sort(function(a,b){
+      if(ui.sort==='steps') return stepsForProject(b.id).length - stepsForProject(a.id).length;
+      if(ui.sort==='progress') return projectProgressPct_(a) - projectProgressPct_(b);
+      if(ui.sort==='deadline'){
+        var da = projectSoonestOpenDeadline_(a), db = projectSoonestOpenDeadline_(b);
+        if(!da && !db) return (a.name||'').localeCompare(b.name||'');
+        if(!da) return 1; if(!db) return -1;
+        return da < db ? -1 : da > db ? 1 : 0;
+      }
+      return (a.name||'').localeCompare(b.name||'');
+    });
+
+    if(!sorted.length){
+      gridEl.innerHTML = '<div class="project-empty">No projects match "'+esc(ui.search)+'".</div>';
+      return;
+    }
+
+    gridEl.innerHTML = sorted.map(function(p){
       var steps = stepsForProject(p.id), sprints = sprintsForProject(p.id);
       var done = steps.filter(function(s){ return s.status==='Submitted'||s.status==='Approved'; }).length;
-      return '<div class="project-card" data-id="'+esc(p.id)+'" tabindex="0" role="button" aria-label="Open '+esc(p.name)+'">'+
-        '<div class="project-card-top"><span class="project-dot" style="background:'+projectColor(p.id)+'"></span>'+
+      var pct = steps.length ? Math.round(100*done/steps.length) : 0;
+      var status = computeProjectStatus(p);
+      var accent = projectColor(p.id);
+      return '<div class="project-card" data-id="'+esc(p.id)+'" tabindex="0" role="button" aria-label="Open '+esc(p.name)+'" style="--accent:'+accent+'">'+
+        '<div class="project-card-top"><span class="project-dot" style="background:'+accent+'"></span>'+
         '<span class="project-card-name">'+esc(p.name)+'</span>'+
-        (showOwner && p.ownerName ? '<span class="project-owner-tag">'+esc(p.ownerName)+'</span>' : '')+
         '</div>'+
+        // Owner sits on its own line rather than squeezed beside the name — competing for
+        // the same row was truncating longer project names down to a couple characters.
+        (showOwner && p.ownerName ? '<div class="project-card-owner-row"><span class="project-owner-tag">'+esc(p.ownerName)+'</span></div>' : '')+
         '<div class="project-card-desc">'+esc(p.description||'No description yet.')+'</div>'+
+        '<div class="project-card-status"><span class="status-pill" style="background:color-mix(in srgb, '+status.color+' 16%, transparent);color:'+status.color+';">'+
+          '<i style="background:'+status.color+'"></i>'+esc(status.label)+'</span></div>'+
+        (steps.length ? '<div class="project-card-progress"><div class="track"><div class="fill" style="width:'+pct+'%;background:'+accent+'"></div></div>'+
+          '<span class="project-card-progress-pct">'+pct+'%</span></div>' : '')+
         '<div class="project-card-stats"><span><b>'+sprints.length+'</b> sprint'+(sprints.length===1?'':'s')+'</span>'+
         '<span><b>'+steps.length+'</b> step'+(steps.length===1?'':'s')+'</span>'+
         '<span><b>'+done+'</b> done</span></div>'+
         '</div>';
     }).join('');
-    el.querySelectorAll('[data-id]').forEach(function(card){
+    gridEl.querySelectorAll('[data-id]').forEach(function(card){
       card.addEventListener('click', function(){ openProjectDetail(card.getAttribute('data-id')); });
       card.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openProjectDetail(card.getAttribute('data-id')); } });
     });
@@ -3416,7 +3584,26 @@
     document.getElementById('pd-name').textContent = p.name;
     document.getElementById('pd-desc').textContent = p.description || '';
     document.getElementById('pd-notes').textContent = p.notes || 'No notes.';
+    renderProjectDetailStats(p);
     renderGantt(id);
+  }
+  /** The header stats bar on a project's detail page — a Monday-style "group summary"
+   *  row: status pill, date span + day count, sprint/step counts, and an overall
+   *  progress meter, all visible before scrolling into the Gantt itself. */
+  function renderProjectDetailStats(p){
+    var el = document.getElementById('pd-stats-bar');
+    var sprints = sprintsForProject(p.id), steps = stepsForProject(p.id);
+    var done = steps.filter(function(s){ return s.status==='Submitted'||s.status==='Approved'; }).length;
+    var pct = steps.length ? Math.round(100*done/steps.length) : 0;
+    var status = computeProjectStatus(p);
+    var range = projectDateRange(p);
+    el.innerHTML =
+      '<span class="status-pill" style="background:color-mix(in srgb, '+status.color+' 16%, transparent);color:'+status.color+';">'+
+        '<i style="background:'+status.color+'"></i>'+esc(status.label)+'</span>'+
+      (range ? '<div class="pd-stat"><div class="pd-stat-num">'+fmtDateShort(range.start)+' – '+fmtDateShort(range.end)+'</div><div class="pd-stat-lbl">'+range.days+' day'+(range.days===1?'':'s')+'</div></div>' : '')+
+      '<div class="pd-stat"><div class="pd-stat-num">'+sprints.length+'</div><div class="pd-stat-lbl">Sprint'+(sprints.length===1?'':'s')+'</div></div>'+
+      '<div class="pd-stat"><div class="pd-stat-num">'+steps.length+'</div><div class="pd-stat-lbl">Step'+(steps.length===1?'':'s')+'</div></div>'+
+      (steps.length ? '<div class="pd-stats-progress"><div class="track"><div class="fill" style="width:'+pct+'%;background:'+projectColor(p.id)+'"></div></div><span class="pd-stats-progress-pct">'+pct+'% done</span></div>' : '');
   }
 
   /** Shared date-axis math for any Gantt-style view: given a list of ISO date strings
