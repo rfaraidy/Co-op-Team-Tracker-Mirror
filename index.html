@@ -1191,6 +1191,30 @@
   // instead, scoped to the connected sheet, so teammates don't retype it
   // every visit but it never ends up in a copy-pasted URL.
   function keyStorageName(){ return 'coopTrackerKey::' + (CONFIG.API_URL || ''); }
+  // Last-known-good snapshot of everything doGet returns, cached per-sheet (same
+  // scoping as keyStorageName above) so a returning visit can render instantly from
+  // it (see boot()/silentRefresh below) instead of showing a blank "Checking…" gate
+  // while Apps Script's own cold-start spins up.
+  function dataCacheStorageName(){ return 'coopTrackerCache::' + (CONFIG.API_URL || ''); }
+  function saveDataCache(json){
+    try{
+      localStorage.setItem(dataCacheStorageName(), JSON.stringify({
+        role: json.role || '', studentName: json.studentName || '',
+        tasks: json.tasks || [], students: json.students || [],
+        projects: json.projects || [], sprints: json.sprints || [], steps: json.steps || [],
+        cachedAt: Date.now()
+      }));
+    }catch(e){ /* storage full/unavailable — fine, this is just a best-effort cache */ }
+  }
+  function loadDataCache(){
+    try{
+      var raw = localStorage.getItem(dataCacheStorageName());
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  }
+  // Client-side placeholder id for something added optimistically (see the various
+  // btn-save-* handlers below) before the server hands back the real one.
+  function genTempId(){ return 'temp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8); }
 
   var SAMPLE = !CONFIG.API_URL;
   var state = { tasks: [], students: [], role: '', myName: '', selectedWeek: weekKey(new Date()), selectedMonth: todayMonth(), editingId: null, view: 'overview',
@@ -1388,6 +1412,7 @@
         state.tasks = json.tasks || []; state.students = json.students || [];
         state.projects = json.projects || []; state.sprints = json.sprints || []; state.steps = json.steps || [];
         updateRoleUI();
+        saveDataCache(json);
       } else if(isAuthError(json)){
         // The stored passphrase no longer works (e.g. it was changed
         // server-side) — drop it and send the person back to the gate
@@ -1454,7 +1479,8 @@
     state.role = '';
     state.myName = '';
     try{ localStorage.removeItem(keyStorageName()); }catch(e){}
-    state.tasks = []; state.students = [];
+    try{ localStorage.removeItem(dataCacheStorageName()); }catch(e){}
+    state.tasks = []; state.students = []; state.projects = []; state.sprints = []; state.steps = [];
     updateRoleUI();
     renderAll();
     showGate();
@@ -1478,6 +1504,7 @@
         // something else happened to call fetchTasks() and backfill them.
         state.projects = json.projects || []; state.sprints = json.sprints || []; state.steps = json.steps || [];
         try{ localStorage.setItem(keyStorageName(), key); }catch(e){}
+        saveDataCache(json);
         hideGate();
         updateRoleUI();
         renderAll();
@@ -1492,15 +1519,55 @@
       showGateError('Could not reach the sheet — check your connection and try again.');
     });
   }
+  /** Background refresh used only by the stale-while-revalidate boot path below —
+   *  the person is already looking at a cached view, so unlike attemptUnlock this
+   *  never touches the (hidden) gate UI, and a failure here doesn't interrupt them:
+   *  a genuinely invalid passphrase still locks them out (same as fetchTasks does),
+   *  but a network hiccup just leaves the cached view showing as-is. */
+  function silentRefresh(key){
+    CONFIG.KEY = key;
+    fetch(apiUrlWithKey()).then(function(r){return r.json();}).then(function(json){
+      if(json && json.ok){
+        state.role = json.role || state.role;
+        state.myName = json.studentName || '';
+        state.tasks = json.tasks || []; state.students = json.students || [];
+        state.projects = json.projects || []; state.sprints = json.sprints || []; state.steps = json.steps || [];
+        updateRoleUI();
+        renderAll();
+        saveDataCache(json);
+      } else if(isAuthError(json)){
+        lockOut(json.error);
+      }
+      // Any other failure (rare/malformed response) is left alone here — the
+      // cached view already on screen stays as-is.
+    }).catch(function(){ /* network hiccup — leave the cached view showing */ });
+  }
   function boot(){
     if(!CONFIG.API_URL){
       fetchTasks();
       return;
     }
-    showGate();
     var stored = '';
     try{ stored = localStorage.getItem(keyStorageName()) || ''; }catch(e){}
-    if(stored){
+    if(!stored){
+      showGate();
+      return;
+    }
+    var cached = loadDataCache();
+    if(cached){
+      // Stale-while-revalidate: render instantly from the last-known-good snapshot
+      // instead of showing a blank "Checking…" gate while Apps Script's own
+      // cold-start spins up, then quietly refresh with live data in the background.
+      CONFIG.KEY = stored;
+      state.role = cached.role || ''; state.myName = cached.studentName || '';
+      state.tasks = cached.tasks || []; state.students = cached.students || [];
+      state.projects = cached.projects || []; state.sprints = cached.sprints || []; state.steps = cached.steps || [];
+      hideGate();
+      updateRoleUI();
+      renderAll();
+      silentRefresh(stored);
+    } else {
+      showGate();
       document.getElementById('gate-key').value = stored;
       showGateError('Checking…');
       attemptUnlock(stored);
@@ -2541,15 +2608,28 @@
       showToast('Updated (sample mode).');
       return;
     }
+    // Optimistic: flip it immediately instead of waiting on the round trip to Apps
+    // Script — that wait (not the data itself) is what made this feel laggy. Rolled
+    // back automatically if the update actually fails.
+    var rollbackSnapshot = Object.assign({}, t);
+    Object.assign(t, data, {updatedAt:new Date().toISOString()});
+    renderAll();
+    refreshOpenModal();
     apiCall('updateTask', {id:id, data:data}).then(function(res){
-      if(!res || res.ok===false){ showToast('Update failed.'); return; }
-      // Apply the server's authoritative row locally instead of paying for a full
-      // reload (doGet) just to see the change we already know happened — this is
-      // what makes save/edit/delete feel instant instead of laggy.
+      if(!res || res.ok===false){
+        Object.assign(t, rollbackSnapshot);
+        renderAll(); refreshOpenModal();
+        showToast('Update failed — reverted.');
+        return;
+      }
       Object.assign(t, res.row || data, {updatedAt: (res.row && res.row.updatedAt) || new Date().toISOString()});
       renderAll();
       refreshOpenModal();
-    }).catch(function(){});
+    }).catch(function(){
+      Object.assign(t, rollbackSnapshot);
+      renderAll(); refreshOpenModal();
+      showToast('Could not reach the sheet — reverted. Check Settings and try again.');
+    });
   }
 
   document.getElementById('btn-add-step').addEventListener('click', function(){
@@ -2606,20 +2686,45 @@
       return;
     }
 
-    var promise = isEdit ? apiCall('updateTask', {id: state.editingId, data:data}) : apiCall('addTask', {data:data});
+    // Optimistic update: apply the change and close the modal immediately instead
+    // of waiting on the round trip to Apps Script — THAT wait, not the data itself,
+    // is what makes every save feel sluggish. If the save actually fails, the
+    // change is rolled back and a clear toast explains that.
+    var editedId = state.editingId;
+    var rollbackSnapshot = null, addedRow = null;
+    if(isEdit){
+      var target = state.tasks.find(function(x){return x.id===editedId;});
+      if(target){ rollbackSnapshot = Object.assign({}, target); Object.assign(target, data, {updatedAt: new Date().toISOString()}); }
+    } else {
+      addedRow = Object.assign({}, data, {id: genTempId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()});
+      state.tasks.push(addedRow);
+    }
+    closeTaskModal();
+    renderAll();
+    if(isEdit) showToast('Saved.');
+
+    var promise = isEdit ? apiCall('updateTask', {id: editedId, data:data}) : apiCall('addTask', {data:data});
     promise.then(function(res){
-      if(!res || res.ok===false){ showToast('Save failed: ' + (res&&res.error||'unknown error')); return; }
-      closeTaskModal();
+      if(!res || res.ok===false){
+        if(isEdit && rollbackSnapshot){
+          var t = state.tasks.find(function(x){return x.id===editedId;});
+          if(t) Object.assign(t, rollbackSnapshot);
+        } else if(addedRow){
+          state.tasks = state.tasks.filter(function(x){return x!==addedRow;});
+        }
+        renderAll();
+        showToast('Save failed — your change was undone. ' + (res&&res.error||''));
+        return;
+      }
       // Apply the server's authoritative row straight to local state instead of
       // doing a full reload (fetchTasks/doGet) just to see what we already know
-      // we just saved — this is what makes save/edit/delete feel instant.
+      // we just saved.
       if(isEdit){
-        var existing = state.tasks.find(function(x){return x.id===state.editingId;});
-        if(existing) Object.assign(existing, res.row || data);
-      } else if(res.row){
-        state.tasks.push(res.row);
-      } else if(res.id){
-        state.tasks.push(Object.assign({}, data, {id: res.id}));
+        var t2 = state.tasks.find(function(x){return x.id===editedId;});
+        if(t2) Object.assign(t2, res.row || data);
+      } else if(addedRow){
+        var idx = state.tasks.indexOf(addedRow);
+        if(idx > -1) state.tasks[idx] = res.row || Object.assign({}, data, {id: res.id || addedRow.id});
       }
       renderAll();
       // Notification emails only ever fire on brand-new rows (addTask), never on
@@ -2631,10 +2736,19 @@
         showToast(res.emailSent
           ? 'Saved — emailed ' + studentName + '.'
           : 'Saved. No email on file for ' + studentName + ' — add one in Team to notify them next time.');
-      } else {
+      } else if(!isEdit){
         showToast('Saved.');
       }
-    }).catch(function(){});
+    }).catch(function(){
+      if(isEdit && rollbackSnapshot){
+        var t3 = state.tasks.find(function(x){return x.id===editedId;});
+        if(t3) Object.assign(t3, rollbackSnapshot);
+      } else if(addedRow){
+        state.tasks = state.tasks.filter(function(x){return x!==addedRow;});
+      }
+      renderAll();
+      showToast('Could not reach the sheet — your change was undone. Check Settings and try again.');
+    });
   });
 
   document.getElementById('btn-delete-task').addEventListener('click', function(){
@@ -2648,11 +2762,23 @@
     }
 
     var deletedId = state.editingId;
+    var removedIdx = state.tasks.findIndex(function(x){return x.id===deletedId;});
+    var removedRow = removedIdx > -1 ? state.tasks[removedIdx] : null;
+    // Optimistic: remove and close immediately, roll back if the delete actually fails.
+    state.tasks = state.tasks.filter(function(x){return x.id!==deletedId;});
+    closeTaskModal(); showToast('Deleted.'); renderAll();
+
     apiCall('deleteTask', {id: deletedId}).then(function(res){
-      if(!res || res.ok===false){ showToast('Delete failed.'); return; }
-      state.tasks = state.tasks.filter(function(x){return x.id!==deletedId;});
-      closeTaskModal(); showToast('Deleted.'); renderAll();
-    }).catch(function(){});
+      if(!res || res.ok===false){
+        if(removedRow) state.tasks.splice(Math.min(removedIdx, state.tasks.length), 0, removedRow);
+        renderAll();
+        showToast('Delete failed — the task was restored.');
+      }
+    }).catch(function(){
+      if(removedRow) state.tasks.splice(Math.min(removedIdx, state.tasks.length), 0, removedRow);
+      renderAll();
+      showToast('Could not reach the sheet — the task was restored. Check Settings and try again.');
+    });
   });
 
   /* ---------- settings modal ---------- */
@@ -3750,22 +3876,64 @@
       closeProjectModal(); showToast('Saved (sample mode — connect Settings to persist for real).');
       return;
     }
-    var promise = isEdit ? apiCall('updateProject', {id: state.editingProjectId, data:data}) : apiCall('addProject', {data:data});
+    // Optimistic: apply immediately and jump straight into the (new or edited)
+    // project's detail page instead of waiting on the round trip to Apps Script —
+    // rolled back automatically if the save actually fails.
+    var editedId = state.editingProjectId;
+    var rollbackSnapshot = null, addedRow = null;
+    if(isEdit){
+      var existing = projectById(editedId);
+      if(existing){ rollbackSnapshot = Object.assign({}, existing); Object.assign(existing, data, {updatedAt: new Date().toISOString()}); }
+    } else {
+      addedRow = Object.assign({}, data, {id: genTempId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ownerName: state.myName || ''});
+      state.projects.push(addedRow);
+    }
+    closeProjectModal();
+    renderProjectsTab();
+    if(isEdit){ renderProjectDetail(); showToast('Saved.'); }
+    else { openProjectDetail(addedRow.id); }
+
+    var promise = isEdit ? apiCall('updateProject', {id: editedId, data:data}) : apiCall('addProject', {data:data});
     promise.then(function(res){
-      if(!res || res.ok===false){ showToast('Save failed: ' + (res&&res.error||'unknown error')); return; }
-      closeProjectModal();
-      // Apply the server's authoritative row locally instead of a full reload —
-      // this is what makes save/edit/delete feel instant instead of laggy.
+      if(!res || res.ok===false){
+        if(isEdit && rollbackSnapshot){
+          var t = projectById(editedId);
+          if(t) Object.assign(t, rollbackSnapshot);
+          renderProjectsTab(); renderProjectDetail();
+        } else if(addedRow){
+          state.projects = state.projects.filter(function(x){return x!==addedRow;});
+          switchView('projects'); renderProjectsTab();
+        }
+        showToast('Save failed — your change was undone. ' + (res&&res.error||''));
+        return;
+      }
+      // Apply the server's authoritative row locally instead of a full reload.
       if(isEdit){
-        var existing = projectById(state.editingProjectId);
-        if(existing) Object.assign(existing, res.row || data);
-      } else if(res.row){
-        state.projects.push(res.row);
+        var t2 = projectById(editedId);
+        if(t2) Object.assign(t2, res.row || data);
+      } else if(addedRow && res.row){
+        var idx = state.projects.indexOf(addedRow);
+        if(idx > -1){
+          var oldId = addedRow.id;
+          state.projects[idx] = res.row;
+          // The detail page was opened under the temp id — swap it to the real
+          // one now that the server has assigned it, so later edits target it.
+          if(state.detailProject === oldId) state.detailProject = res.row.id;
+        }
       }
       renderProjectsTab();
-      if(isEdit) renderProjectDetail();
-      else if(res.id) openProjectDetail(res.id);
-    }).catch(function(){ showToast('Could not reach the sheet — check Settings and try again.'); });
+      if(state.detailProject) renderProjectDetail();
+    }).catch(function(){
+      if(isEdit && rollbackSnapshot){
+        var t3 = projectById(editedId);
+        if(t3) Object.assign(t3, rollbackSnapshot);
+        renderProjectsTab(); renderProjectDetail();
+      } else if(addedRow){
+        state.projects = state.projects.filter(function(x){return x!==addedRow;});
+        switchView('projects'); renderProjectsTab();
+      }
+      showToast('Could not reach the sheet — your change was undone. Check Settings and try again.');
+    });
   });
   document.getElementById('btn-delete-project').addEventListener('click', function(){
     var id = state.detailProject; var p = projectById(id);
@@ -3779,17 +3947,33 @@
       showToast('Deleted (sample mode).');
       return;
     }
+    // Optimistic: remove (with the same sprint/step cascade the server does) and
+    // leave the detail page immediately, roll back if the delete actually fails.
+    var removedProject = p;
+    var removedSprints = state.sprints.filter(function(x){ return x.projectId===id; });
+    var removedSteps = state.steps.filter(function(x){ return x.projectId===id; });
+    state.projects = state.projects.filter(function(x){ return x.id!==id; });
+    state.sprints = state.sprints.filter(function(x){ return x.projectId!==id; });
+    state.steps = state.steps.filter(function(x){ return x.projectId!==id; });
+    switchView('projects');
+    renderProjectsTab();
+    showToast('Project deleted.');
+
     apiCall('deleteProject', {id:id}).then(function(res){
-      if(!res || res.ok===false){ showToast('Delete failed.'); return; }
-      // Server cascade-deletes sprints/steps under this project — mirror that
-      // locally rather than round-tripping to find out what we already know.
-      state.projects = state.projects.filter(function(x){ return x.id!==id; });
-      state.sprints = state.sprints.filter(function(x){ return x.projectId!==id; });
-      state.steps = state.steps.filter(function(x){ return x.projectId!==id; });
-      switchView('projects');
+      if(!res || res.ok===false){
+        state.projects.push(removedProject);
+        removedSprints.forEach(function(s){ state.sprints.push(s); });
+        removedSteps.forEach(function(s){ state.steps.push(s); });
+        renderProjectsTab();
+        showToast('Delete failed — the project was restored.');
+      }
+    }).catch(function(){
+      state.projects.push(removedProject);
+      removedSprints.forEach(function(s){ state.sprints.push(s); });
+      removedSteps.forEach(function(s){ state.steps.push(s); });
       renderProjectsTab();
-      showToast('Project deleted.');
-    }).catch(function(){ showToast('Could not reach the sheet — check Settings and try again.'); });
+      showToast('Could not reach the sheet — the project was restored. Check Settings and try again.');
+    });
   });
 
   /* ---------- Sprint modal (add/edit) ---------- */
@@ -3827,18 +4011,51 @@
       showToast('Saved (sample mode — connect Settings to persist for real).');
       return;
     }
-    var promise = isEdit ? apiCall('updateSprint', {id: state.editingSprintId, data:data}) : apiCall('addSprint', {data:data});
+    // Optimistic: apply and close the modal immediately, roll back if the save
+    // actually fails.
+    var editedId = state.editingSprintId;
+    var rollbackSnapshot = null, addedRow = null;
+    if(isEdit){
+      var existing = sprintById(editedId);
+      if(existing){ rollbackSnapshot = Object.assign({}, existing); Object.assign(existing, data, {updatedAt: new Date().toISOString()}); }
+    } else {
+      addedRow = Object.assign({}, data, {id: genTempId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()});
+      state.sprints.push(addedRow);
+    }
+    closeSprintModal(); renderProjectDetail(); renderProjectsTab();
+    showToast('Saved.');
+
+    var promise = isEdit ? apiCall('updateSprint', {id: editedId, data:data}) : apiCall('addSprint', {data:data});
     promise.then(function(res){
-      if(!res || res.ok===false){ showToast('Save failed: ' + (res&&res.error||'unknown error')); return; }
-      closeSprintModal();
+      if(!res || res.ok===false){
+        if(isEdit && rollbackSnapshot){
+          var t = sprintById(editedId);
+          if(t) Object.assign(t, rollbackSnapshot);
+        } else if(addedRow){
+          state.sprints = state.sprints.filter(function(x){return x!==addedRow;});
+        }
+        renderProjectDetail(); renderProjectsTab();
+        showToast('Save failed — your change was undone. ' + (res&&res.error||''));
+        return;
+      }
       if(isEdit){
-        var existing = sprintById(state.editingSprintId);
-        if(existing) Object.assign(existing, res.row || data);
-      } else if(res.row){
-        state.sprints.push(res.row);
+        var t2 = sprintById(editedId);
+        if(t2) Object.assign(t2, res.row || data);
+      } else if(addedRow && res.row){
+        var idx = state.sprints.indexOf(addedRow);
+        if(idx > -1) state.sprints[idx] = res.row;
       }
       renderProjectDetail(); renderProjectsTab();
-    }).catch(function(){ showToast('Could not reach the sheet — check Settings and try again.'); });
+    }).catch(function(){
+      if(isEdit && rollbackSnapshot){
+        var t3 = sprintById(editedId);
+        if(t3) Object.assign(t3, rollbackSnapshot);
+      } else if(addedRow){
+        state.sprints = state.sprints.filter(function(x){return x!==addedRow;});
+      }
+      renderProjectDetail(); renderProjectsTab();
+      showToast('Could not reach the sheet — your change was undone. Check Settings and try again.');
+    });
   });
   document.getElementById('btn-delete-sprint').addEventListener('click', function(){
     var id = state.editingSprintId; var sp = sprintById(id);
@@ -3851,15 +4068,28 @@
       showToast('Deleted (sample mode).');
       return;
     }
+    // Optimistic: remove (with the same step cascade the server does) and close
+    // immediately, roll back if the delete actually fails.
+    var removedSprint = sp;
+    var removedSteps = state.steps.filter(function(x){ return x.sprintId===id; });
+    state.sprints = state.sprints.filter(function(x){ return x.id!==id; });
+    state.steps = state.steps.filter(function(x){ return x.sprintId!==id; });
+    closeSprintModal(); renderProjectDetail(); renderProjectsTab();
+    showToast('Sprint deleted.');
+
     apiCall('deleteSprint', {id:id}).then(function(res){
-      if(!res || res.ok===false){ showToast('Delete failed.'); return; }
-      closeSprintModal();
-      // Server cascade-deletes this sprint's steps — mirror that locally.
-      state.sprints = state.sprints.filter(function(x){ return x.id!==id; });
-      state.steps = state.steps.filter(function(x){ return x.sprintId!==id; });
+      if(!res || res.ok===false){
+        state.sprints.push(removedSprint);
+        removedSteps.forEach(function(s){ state.steps.push(s); });
+        renderProjectDetail(); renderProjectsTab();
+        showToast('Delete failed — the sprint was restored.');
+      }
+    }).catch(function(){
+      state.sprints.push(removedSprint);
+      removedSteps.forEach(function(s){ state.steps.push(s); });
       renderProjectDetail(); renderProjectsTab();
-      showToast('Sprint deleted.');
-    }).catch(function(){ showToast('Could not reach the sheet — check Settings and try again.'); });
+      showToast('Could not reach the sheet — the sprint was restored. Check Settings and try again.');
+    });
   });
 
   /* ---------- Step modal (add/edit) ---------- */
@@ -3902,18 +4132,51 @@
       showToast('Saved (sample mode — connect Settings to persist for real).');
       return;
     }
-    var promise = isEdit ? apiCall('updateStep', {id: state.editingStepId, data:data}) : apiCall('addStep', {data:data});
+    // Optimistic: apply and close the modal immediately, roll back if the save
+    // actually fails.
+    var editedId = state.editingStepId;
+    var rollbackSnapshot = null, addedRow = null;
+    if(isEdit){
+      var existing = state.steps.find(function(x){return x.id===editedId;});
+      if(existing){ rollbackSnapshot = Object.assign({}, existing); Object.assign(existing, data, {updatedAt: new Date().toISOString()}); }
+    } else {
+      addedRow = Object.assign({}, data, {id: genTempId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()});
+      state.steps.push(addedRow);
+    }
+    closeStepModal(); renderProjectDetail(); renderProjectsTab();
+    showToast('Saved.');
+
+    var promise = isEdit ? apiCall('updateStep', {id: editedId, data:data}) : apiCall('addStep', {data:data});
     promise.then(function(res){
-      if(!res || res.ok===false){ showToast('Save failed: ' + (res&&res.error||'unknown error')); return; }
-      closeStepModal();
+      if(!res || res.ok===false){
+        if(isEdit && rollbackSnapshot){
+          var t = state.steps.find(function(x){return x.id===editedId;});
+          if(t) Object.assign(t, rollbackSnapshot);
+        } else if(addedRow){
+          state.steps = state.steps.filter(function(x){return x!==addedRow;});
+        }
+        renderProjectDetail(); renderProjectsTab();
+        showToast('Save failed — your change was undone. ' + (res&&res.error||''));
+        return;
+      }
       if(isEdit){
-        var existing = state.steps.find(function(x){return x.id===state.editingStepId;});
-        if(existing) Object.assign(existing, res.row || data);
-      } else if(res.row){
-        state.steps.push(res.row);
+        var t2 = state.steps.find(function(x){return x.id===editedId;});
+        if(t2) Object.assign(t2, res.row || data);
+      } else if(addedRow && res.row){
+        var idx = state.steps.indexOf(addedRow);
+        if(idx > -1) state.steps[idx] = res.row;
       }
       renderProjectDetail(); renderProjectsTab();
-    }).catch(function(){ showToast('Could not reach the sheet — check Settings and try again.'); });
+    }).catch(function(){
+      if(isEdit && rollbackSnapshot){
+        var t3 = state.steps.find(function(x){return x.id===editedId;});
+        if(t3) Object.assign(t3, rollbackSnapshot);
+      } else if(addedRow){
+        state.steps = state.steps.filter(function(x){return x!==addedRow;});
+      }
+      renderProjectDetail(); renderProjectsTab();
+      showToast('Could not reach the sheet — your change was undone. Check Settings and try again.');
+    });
   });
   document.getElementById('btn-delete-step').addEventListener('click', function(){
     var id = state.editingStepId; var st = state.steps.find(function(x){return x.id===id;});
@@ -3925,13 +4188,23 @@
       showToast('Deleted (sample mode).');
       return;
     }
+    // Optimistic: remove and close immediately, roll back if the delete actually fails.
+    var removedStep = st;
+    state.steps = state.steps.filter(function(x){ return x.id!==id; });
+    closeStepModal(); renderProjectDetail(); renderProjectsTab();
+    showToast('Step deleted.');
+
     apiCall('deleteStep', {id:id}).then(function(res){
-      if(!res || res.ok===false){ showToast('Delete failed.'); return; }
-      closeStepModal();
-      state.steps = state.steps.filter(function(x){ return x.id!==id; });
+      if(!res || res.ok===false){
+        state.steps.push(removedStep);
+        renderProjectDetail(); renderProjectsTab();
+        showToast('Delete failed — the step was restored.');
+      }
+    }).catch(function(){
+      state.steps.push(removedStep);
       renderProjectDetail(); renderProjectsTab();
-      showToast('Step deleted.');
-    }).catch(function(){ showToast('Could not reach the sheet — check Settings and try again.'); });
+      showToast('Could not reach the sheet — the step was restored. Check Settings and try again.');
+    });
   });
 
   /* ---------- toast ---------- */
