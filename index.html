@@ -283,6 +283,8 @@
   .back-link{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--text-secondary);
     background:none;border:none;cursor:pointer;padding:4px 0;margin-bottom:10px;}
   .back-link:hover{color:var(--text-primary);}
+  .proj-scope-bar{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+  .proj-scope-name{font-size:13px;font-weight:700;color:var(--text-primary);}
   .sd-head{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
   .sd-head .avatar{width:44px;height:44px;font-size:16px;}
   .sd-head h1{font-size:20px;margin:0 0 2px;}
@@ -514,6 +516,10 @@
     border-radius:50%;background:rgba(255,255,255,.55);}
   .gantt-row.is-clickable{cursor:pointer;}
   .gantt-row.is-clickable:hover .gantt-track{background:var(--gridline);}
+  .gantt-row.is-highlighted .gantt-label{background:color-mix(in srgb, var(--series-1) 16%, var(--surface-1));}
+  .gantt-row.is-highlighted .gantt-track{background:color-mix(in srgb, var(--series-1) 8%, transparent);}
+  .gantt-bar.is-highlighted{outline:2px solid var(--series-1);outline-offset:1px;animation:gantt-highlight-pulse 1.6s ease-in-out 2;}
+  @keyframes gantt-highlight-pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb, var(--series-1) 55%, transparent);}50%{box-shadow:0 0 0 5px color-mix(in srgb, var(--series-1) 0%, transparent);}}
 
   /* Gantt toolbar (search / status filter / person filter / zoom) — shared by the
      per-project Gantt and admin's combined timeline. */
@@ -821,33 +827,19 @@
 
   <!-- PROJECTS -->
   <section class="view" id="view-projects">
+    <div class="proj-scope-bar" id="proj-scope-bar" style="display:none;">
+      <button class="back-link" id="btn-projscope-back" style="margin:0;">‹ Back to team</button>
+      <span class="proj-scope-name" id="proj-scope-name"></span>
+    </div>
     <div class="section-head">
-      <h2>Projects</h2>
+      <h2 id="proj-view-title">Projects</h2>
       <button class="btn btn-primary" id="btn-add-project">+ Add Project</button>
     </div>
 
     <div class="stat-row stat-row-4" id="proj-stat-row" style="margin-bottom:22px;"></div>
 
-    <!-- Combined timeline across every project visible to this login — just this member's
-         own projects, or (admin) every member's, grouped by owner first. Same drill-down
-         behavior as a single project's own Timeline below (see renderTimelineTree_). -->
-    <div class="card-panel" id="tl-summary-panel" style="margin-top:4px;">
-      <div class="section-head" style="margin:0 0 12px;"><h2 id="tl-summary-title">Summary timeline</h2></div>
-      <div id="tl-summary-toolbar"></div>
-      <div class="gantt-wrap" id="tl-summary-gantt"></div>
-      <div class="gantt-legend" id="tl-summary-project-legend" style="margin-top:10px;"></div>
-      <div class="gantt-legend" style="margin-top:4px;">
-        <span><i class="dot" style="background:var(--text-muted);"></i>Not Started</span>
-        <span><i class="dot" style="background:var(--status-info);"></i>In Progress</span>
-        <span><i class="dot" style="background:var(--series-1);"></i>Submitted</span>
-        <span><i class="dot" style="background:var(--status-good);"></i>Approved</span>
-        <span><i class="dot" style="background:var(--status-critical);"></i>Blocked</span>
-        <span>&nbsp;·&nbsp;click a name or bar to expand it · click-drag the timeline to pan</span>
-      </div>
-    </div>
-
-    <div class="section-head" style="margin-top:22px;">
-      <h2>All steps calendar</h2>
+    <div class="section-head" style="margin-top:4px;">
+      <h2 id="proj-cal-title">All steps calendar</h2>
       <div class="nav-week">
         <button class="nav-arrow" id="proj-cal-prev">‹</button>
         <span class="lbl" id="proj-cal-label">Month</span>
@@ -862,6 +854,24 @@
       </div>
     </div>
 
+    <!-- Combined timeline across every project visible to this login — just this member's
+         own projects, or (admin) every member's, grouped by owner first. Same drill-down
+         behavior as a single project's own Timeline below (see renderTimelineTree_). -->
+    <div class="card-panel" id="tl-summary-panel" style="margin-top:22px;">
+      <div class="section-head" style="margin:0 0 12px;"><h2 id="tl-summary-title">Summary timeline</h2></div>
+      <div id="tl-summary-toolbar"></div>
+      <div class="gantt-wrap" id="tl-summary-gantt"></div>
+      <div class="gantt-legend" id="tl-summary-project-legend" style="margin-top:10px;"></div>
+      <div class="gantt-legend" style="margin-top:4px;">
+        <span><i class="dot" style="background:var(--text-muted);"></i>Not Started</span>
+        <span><i class="dot" style="background:var(--status-info);"></i>In Progress</span>
+        <span><i class="dot" style="background:var(--series-1);"></i>Submitted</span>
+        <span><i class="dot" style="background:var(--status-good);"></i>Approved</span>
+        <span><i class="dot" style="background:var(--status-critical);"></i>Blocked</span>
+        <span>&nbsp;·&nbsp;click a name or bar to expand it · click-drag the timeline to pan</span>
+      </div>
+    </div>
+
     <div class="section-head" style="margin-top:22px;"><h2>Steps by project</h2></div>
     <div class="card-panel">
       <div class="donut-row">
@@ -870,7 +880,7 @@
       </div>
     </div>
 
-    <div class="section-head" style="margin-top:22px;"><h2>All projects</h2></div>
+    <div class="section-head" style="margin-top:22px;"><h2 id="proj-grid-title">All projects</h2></div>
     <div id="project-toolbar"></div>
     <div class="project-grid" id="project-grid"></div>
   </section>
@@ -893,21 +903,6 @@
     <div class="pd-stats-bar" id="pd-stats-bar"></div>
 
     <div class="section-head" style="margin-top:14px;">
-      <h2>Timeline</h2>
-      <button class="btn btn-primary" id="btn-add-sprint">+ Add Sprint</button>
-    </div>
-    <div id="pd-gantt-toolbar"></div>
-    <div class="gantt-wrap" id="pd-gantt"></div>
-    <div class="gantt-legend" id="pd-gantt-legend">
-      <span><i style="background:var(--text-muted)"></i>Not Started</span>
-      <span><i style="background:var(--status-info)"></i>In Progress</span>
-      <span><i style="background:var(--series-1)"></i>Submitted</span>
-      <span><i style="background:var(--status-good)"></i>Approved</span>
-      <span><i style="background:var(--status-critical)"></i>Blocked</span>
-      <span><i style="border:1.5px dashed var(--text-muted);background:transparent;"></i>Sprint span</span>
-    </div>
-
-    <div class="section-head" style="margin-top:22px;">
       <h2>Calendar</h2>
       <div class="nav-week">
         <button class="nav-arrow" id="pd-cal-prev">‹</button>
@@ -921,6 +916,21 @@
       <div class="heat-legend" style="flex-wrap:wrap;margin-top:12px;">
         <span>&nbsp;·&nbsp; each bar spans the days a step is due — click a bar for details</span>
       </div>
+    </div>
+
+    <div class="section-head" style="margin-top:22px;">
+      <h2>Timeline</h2>
+      <button class="btn btn-primary" id="btn-add-sprint">+ Add Sprint</button>
+    </div>
+    <div id="pd-gantt-toolbar"></div>
+    <div class="gantt-wrap" id="pd-gantt"></div>
+    <div class="gantt-legend" id="pd-gantt-legend">
+      <span><i style="background:var(--text-muted)"></i>Not Started</span>
+      <span><i style="background:var(--status-info)"></i>In Progress</span>
+      <span><i style="background:var(--series-1)"></i>Submitted</span>
+      <span><i style="background:var(--status-good)"></i>Approved</span>
+      <span><i style="background:var(--status-critical)"></i>Blocked</span>
+      <span><i style="border:1.5px dashed var(--text-muted);background:transparent;"></i>Sprint span</span>
     </div>
 
     <div class="card-panel" id="pd-notes-panel" style="margin-top:22px;">
@@ -1255,7 +1265,10 @@
     <div id="entity-info-body"></div>
     <div class="modal-actions">
       <button class="btn" id="entity-info-close-btn">Close</button>
-      <button class="btn btn-primary" id="entity-info-edit-btn">Edit</button>
+      <div class="right">
+        <button class="btn" id="entity-info-locate-btn" style="display:none;">Show in timeline</button>
+        <button class="btn btn-primary" id="entity-info-edit-btn">Edit</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1335,13 +1348,18 @@
     detailStudent: null, studentDetailFrom: 'overview',
     projects: [], sprints: [], steps: [], detailProject: null, projectsCalMonth: todayMonth(), pdCalMonth: todayMonth(),
     editingProjectId: null, editingSprintId: null, editingStepId: null, stepSprintContext: null,
+    // Admin only: when set (a student's name), the whole Projects tab — stats, calendar,
+    // summary timeline, and the card grid — is scoped to just that person's projects,
+    // reached by clicking their card in the team roster below. See renderProjectsTab.
+    projectsPersonScope: null,
     // Search/sort state for the "All projects" card grid (see renderProjectCards below).
     projectsUi: { search: '', sort: 'name' },
     // One shared fold state for every timeline tree (the per-project Timeline, the
     // member's own Summary timeline, and admin's Team timeline) — see renderTimelineTree_.
     // Everything starts collapsed; sprint/step ids are globally unique so a sprint expanded
-    // in one view stays expanded if you reach it again from another.
-    tl: { expandedOwner: {}, expandedProject: {}, expandedSprint: {} },
+    // in one view stays expanded if you reach it again from another. highlightStep is set by
+    // "Show in timeline" from a step's info popup — see jumpToStepInTimeline_.
+    tl: { expandedOwner: {}, expandedProject: {}, expandedSprint: {}, highlightStep: null },
     // Toolbar state for the timeline views (search / status filter / zoom) — "project" is
     // the per-project Timeline, "summary" is the combined Summary/Team timeline, kept
     // separate so filtering one never affects the other. autoFit:true means "compute the
@@ -3333,6 +3351,7 @@
 
   function projectById(id){ return state.projects.find(function(p){ return p.id===id; }); }
   function sprintById(id){ return state.sprints.find(function(s){ return s.id===id; }); }
+  function stepById(id){ return state.steps.find(function(s){ return s.id===id; }); }
   function projectName(id){ var p = projectById(id); return p ? p.name : '(deleted project)'; }
   /** Assigns each project a fixed categorical color by its creation order (sheet row order) —
    *  same SERIES ramp used for student avatars. Wraps past 8 projects rather than the dataviz
@@ -3412,26 +3431,49 @@
   // mine or I'm admin," none of the add/edit/delete controls need their own admin-only gate
   // anymore — the "+ Add Project" button and every per-project action are always shown.
   function renderProjectsTab(){
+    var scoped = isAdmin() && !!state.projectsPersonScope;
+    document.getElementById('proj-scope-bar').style.display = scoped ? 'flex' : 'none';
+    document.getElementById('proj-scope-name').textContent = scoped ? state.projectsPersonScope : '';
+    document.getElementById('proj-view-title').textContent = scoped ? state.projectsPersonScope : 'Projects';
+    document.getElementById('proj-cal-title').textContent = scoped ? 'Steps calendar' : 'All steps calendar';
+    document.getElementById('proj-grid-title').textContent = scoped ? (state.projectsPersonScope+"'s projects") : (isAdmin() ? 'Team' : 'All projects');
+
     renderProjectsStats();
-    renderProjectCards();
-    renderProjectsPie();
     renderProjectsCalendar();
-    document.getElementById('tl-summary-title').textContent = isAdmin() ? 'Team timeline' : 'Summary timeline';
-    renderTimelineTree_({ scope: isAdmin() ? 'team' : 'mine',
+    var summaryScope = isAdmin() && !scoped ? 'team' : 'mine';
+    document.getElementById('tl-summary-title').textContent = summaryScope==='team' ? 'Team timeline' :
+      (scoped ? state.projectsPersonScope+"'s timeline" : 'Summary timeline');
+    renderTimelineTree_({ scope: summaryScope, projects: scoped ? projectsInView() : undefined,
       wrapId: 'tl-summary-gantt', toolbarId: 'tl-summary-toolbar', legendId: 'tl-summary-project-legend' });
+    renderProjectsPie();
+    if(isAdmin() && !scoped) renderPersonCards_(); else renderProjectCards();
   }
   /** Quick-glance stat strip at the top of the Projects tab — active project count, plus
    *  open/due-this-week/overdue steps as proportions (see statMeterTile), so the state of
    *  everything in progress is visible before scrolling into the calendar or card grid. */
+  /** Admin scoping: when state.projectsPersonScope is set (via a card click in the team
+   *  roster at the bottom of the Projects tab), every section of the tab — stats, calendar,
+   *  summary timeline, and the card grid — narrows to just that person's projects, same as
+   *  a member only ever seeing their own. A member's state.projectsPersonScope is always
+   *  null, so these are no-ops (return everything) outside admin. */
+  function projectsInView(){
+    return state.projectsPersonScope ? state.projects.filter(function(p){ return p.ownerName===state.projectsPersonScope; }) : state.projects;
+  }
+  function stepsInView(){
+    if(!state.projectsPersonScope) return state.steps;
+    var ids = {};
+    projectsInView().forEach(function(p){ ids[p.id] = true; });
+    return state.steps.filter(function(s){ return ids[s.projectId]; });
+  }
   function renderProjectsStats(){
     var el = document.getElementById('proj-stat-row');
-    var totalSteps = state.steps.length;
-    var openSteps = state.steps.filter(function(s){ return s.status!=='Submitted' && s.status!=='Approved'; });
+    var totalSteps = stepsInView().length;
+    var openSteps = stepsInView().filter(function(s){ return s.status!=='Submitted' && s.status!=='Approved'; });
     var today = todayISO();
     var overdue = openSteps.filter(function(s){ return s.endDate && s.endDate < today; });
     var dueThisWeek = openSteps.filter(function(s){ return s.endDate && s.endDate >= today && daysBetweenIso(today, s.endDate) <= 7; });
     el.innerHTML =
-      '<div class="stat-tile"><div class="num">'+state.projects.length+'</div><div class="lbl">'+(isPersonal()?'Your projects':'Active projects')+'</div></div>'+
+      '<div class="stat-tile"><div class="num">'+projectsInView().length+'</div><div class="lbl">'+(isPersonal()?'Your projects':state.projectsPersonScope?'Their projects':'Active projects')+'</div></div>'+
       statMeterTile({id:'proj-open-steps', noClick:true, num:openSteps.length, sub:'of '+totalSteps, lbl:'Open steps', pct: totalSteps?Math.round(100*openSteps.length/totalSteps):0, color:'var(--status-info)'})+
       statMeterTile({id:'proj-due-week', noClick:true, num:dueThisWeek.length, sub:'of '+openSteps.length, lbl:'Due this week', pct: openSteps.length?Math.round(100*dueThisWeek.length/openSteps.length):0, color:'var(--status-warning)'})+
       statMeterTile({id:'proj-overdue', noClick:true, num:overdue.length, sub:'of '+openSteps.length, lbl:'Overdue', pct: openSteps.length?Math.round(100*overdue.length/openSteps.length):0, color:'var(--status-critical)'});
@@ -3477,9 +3519,10 @@
     var gridEl = document.getElementById('project-grid');
     var ui = state.projectsUi;
 
-    if(!state.projects.length){
+    var baseProjects = projectsInView();
+    if(!baseProjects.length){
       toolbarEl.innerHTML = '';
-      gridEl.innerHTML = '<div class="project-empty">No projects yet — click "+ Add Project" above to create one.</div>';
+      gridEl.innerHTML = '<div class="project-empty">No projects yet'+(state.projectsPersonScope?' for '+esc(state.projectsPersonScope)+'.':' — click "+ Add Project" above to create one.')+'</div>';
       return;
     }
 
@@ -3487,10 +3530,11 @@
     bindProjectToolbar_(toolbarEl, ui, renderProjectCards);
 
     // Admin sees every member's projects mixed together, so a small owner tag helps tell
-    // them apart; a member only ever has their own, so the tag would be redundant there.
-    var showOwner = isAdmin();
+    // them apart; a member (or an admin already scoped to one person) only ever sees one
+    // person's projects, so the tag would be redundant there.
+    var showOwner = isAdmin() && !state.projectsPersonScope;
     var q = (ui.search||'').trim().toLowerCase();
-    var visible = !q ? state.projects : state.projects.filter(function(p){
+    var visible = !q ? baseProjects : baseProjects.filter(function(p){
       return (p.name||'').toLowerCase().indexOf(q) > -1 ||
         (p.description||'').toLowerCase().indexOf(q) > -1 ||
         (showOwner && (p.ownerName||'').toLowerCase().indexOf(q) > -1);
@@ -3541,18 +3585,65 @@
       card.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openProjectDetail(card.getAttribute('data-id')); } });
     });
   }
+  /** Admin-only roster at the bottom of the (unscoped) Projects tab — one card per project
+   *  owner instead of one per project, so an admin lands on a person first and drills into
+   *  their projects from there. Clicking a card sets state.projectsPersonScope, which narrows
+   *  every section of the tab (stats/calendar/summary timeline/card grid) to that person —
+   *  see openPersonProjects_ and projectsInView/stepsInView above. */
+  function renderPersonCards_(){
+    var toolbarEl = document.getElementById('project-toolbar');
+    var gridEl = document.getElementById('project-grid');
+    toolbarEl.innerHTML = '';
+    var owners = {};
+    state.projects.forEach(function(p){ owners[p.ownerName || 'Unassigned'] = true; });
+    var names = Object.keys(owners).sort(function(a,b){ return a.localeCompare(b); });
+    if(!names.length){
+      gridEl.innerHTML = '<div class="project-empty">No projects yet — click "+ Add Project" above to create one.</div>';
+      return;
+    }
+    gridEl.innerHTML = names.map(function(name){
+      var projects = state.projects.filter(function(p){ return (p.ownerName || 'Unassigned') === name; });
+      var steps = [];
+      projects.forEach(function(p){ steps = steps.concat(stepsForProject(p.id)); });
+      var done = steps.filter(function(s){ return s.status==='Submitted'||s.status==='Approved'; }).length;
+      var pct = steps.length ? Math.round(100*done/steps.length) : 0;
+      return '<div class="project-card" data-person="'+esc(name)+'" tabindex="0" role="button" aria-label="Open '+esc(name)+'\'s projects" style="--accent:var(--text-muted)">'+
+        '<div class="project-card-top"><span class="avatar" style="width:26px;height:26px;font-size:11px;background:var(--text-muted);flex-shrink:0;">'+esc(initials(name))+'</span>'+
+        '<span class="project-card-name">'+esc(name)+'</span>'+
+        '</div>'+
+        (steps.length ? '<div class="project-card-progress"><div class="track"><div class="fill" style="width:'+pct+'%;background:var(--series-1)"></div></div>'+
+          '<span class="project-card-progress-pct">'+pct+'%</span></div>' : '<div class="project-card-desc">No steps yet.</div>')+
+        '<div class="project-card-stats"><span><b>'+projects.length+'</b> project'+(projects.length===1?'':'s')+'</span>'+
+        '<span><b>'+steps.length+'</b> step'+(steps.length===1?'':'s')+'</span>'+
+        '<span><b>'+done+'</b> done</span></div>'+
+        '</div>';
+    }).join('');
+    gridEl.querySelectorAll('[data-person]').forEach(function(card){
+      card.addEventListener('click', function(){ openPersonProjects_(card.getAttribute('data-person')); });
+      card.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openPersonProjects_(card.getAttribute('data-person')); } });
+    });
+  }
+  function openPersonProjects_(name){
+    state.projectsPersonScope = name;
+    renderProjectsTab();
+  }
+  document.getElementById('btn-projscope-back').addEventListener('click', function(){
+    state.projectsPersonScope = null;
+    renderProjectsTab();
+  });
   /** Steps-by-project donut — exact same arc-drawing technique as renderDonut(), keyed by
    *  project instead of status bucket, using each project's categorical SERIES color. */
   function renderProjectsPie(){
     var wrap = document.getElementById('proj-pie');
-    var total = state.steps.length;
+    var projects = projectsInView();
+    var total = stepsInView().length;
     var r = 40, cx = 50, cy = 50, circumference = 2*Math.PI*r, gap = total ? 3 : 0;
     var offset = 0;
     var svgParts = [];
-    if(!total || !state.projects.length){
+    if(!total || !projects.length){
       svgParts.push('<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="var(--gridline)" stroke-width="14"/>');
     } else {
-      state.projects.forEach(function(p){
+      projects.forEach(function(p){
         var n = stepsForProject(p.id).length;
         if(!n) return;
         var len = (n/total) * circumference - gap;
@@ -3566,7 +3657,7 @@
     wrap.innerHTML = '<svg class="donut-svg" viewBox="0 0 100 100">'+svgParts.join('')+'</svg>'+
       '<div class="donut-center"><div class="donut-num">'+total+'</div><div class="donut-lbl">total steps</div></div>';
     bindTooltips(wrap);
-    document.getElementById('proj-pie-legend').innerHTML = state.projects.length ? state.projects.map(function(p){
+    document.getElementById('proj-pie-legend').innerHTML = projects.length ? projects.map(function(p){
       return '<span class="donut-legend-item"><i class="dot" style="background:'+projectColor(p.id)+'"></i>'+esc(p.name)+'<b>'+stepsForProject(p.id).length+'</b></span>';
     }).join('') : '<span class="muted" style="font-size:12.5px;">No projects yet.</span>';
   }
@@ -3652,7 +3743,7 @@
   }
   function renderProjectsCalendar(){
     renderSpanningCalendar_({ calId: 'proj-calendar', labelId: 'proj-cal-label', todayBtnId: 'proj-cal-today',
-      monthKey: 'projectsCalMonth', steps: state.steps, showAvatar: isAdmin() });
+      monthKey: 'projectsCalMonth', steps: stepsInView(), showAvatar: isAdmin() && !state.projectsPersonScope });
   }
   function renderPdCalendar_(){
     renderSpanningCalendar_({ calId: 'pd-calendar', labelId: 'pd-cal-label', todayBtnId: 'pd-cal-today',
@@ -3810,13 +3901,13 @@
     }
     return { totalPx: totalPx, offsetPx: offsetPx, todayLine: todayLine, ticksHtml: ticks.join(''), dayPx: dayPx };
   }
-  function ganttStepBarHtml_(st, offsetPx, dayPx){
+  function ganttStepBarHtml_(st, offsetPx, dayPx, isHighlighted){
     var stStart = st.startDate, stEnd = st.endDate || st.startDate;
     if(!stStart || !stEnd) return '';
     var left = offsetPx(stStart), w = Math.max(6, dayPx, (daysBetweenIso(stStart,stEnd)+1)*dayPx);
     var label = w > 56 ? '<span class="gantt-bar-label">'+esc(st.name)+'</span>' : '';
     var tip = esc(st.name)+' · '+esc(st.status||'Not Started')+(st.assignedStudent?' · '+esc(st.assignedStudent):'')+' · '+fmtDateShort(stStart)+' – '+fmtDateShort(stEnd);
-    return '<div class="gantt-bar" data-open-entity="step:'+esc(st.id)+'" style="left:'+left+'px;width:'+w+'px;background:'+stepStatusColor(st.status)+';" data-tip="'+tip+'">'+label+'</div>';
+    return '<div class="gantt-bar'+(isHighlighted?' is-highlighted':'')+'" data-open-entity="step:'+esc(st.id)+'" style="left:'+left+'px;width:'+w+'px;background:'+stepStatusColor(st.status)+';" data-tip="'+tip+'">'+label+'</div>';
   }
   function ganttSprintBarHtml_(sp, offsetPx, dayPx){
     var spStart = sp.startDate, spEnd = sp.endDate || sp.startDate;
@@ -3972,7 +4063,7 @@
     var legendWrap = opts.legendId ? document.getElementById(opts.legendId) : null;
     var ui = state.ganttUi[opts.scope === 'single' ? 'project' : 'summary'];
 
-    var rootProjects = opts.scope === 'single' ? [projectById(opts.projectId)].filter(Boolean) : state.projects;
+    var rootProjects = opts.scope === 'single' ? [projectById(opts.projectId)].filter(Boolean) : (opts.projects || state.projects);
     var byOwner = null, ownerOrder = null;
     if(opts.scope === 'team'){
       byOwner = {}; ownerOrder = [];
@@ -4048,9 +4139,12 @@
         return;
       }
       visibleSteps.forEach(function(st){
-        rowsHtml.push('<div class="gantt-row is-step">'+
-          '<div class="gantt-label is-step" style="padding-left:'+stepIndent+'px;" data-open-entity="step:'+esc(st.id)+'"><span class="gantt-label-name" data-tip="'+esc(st.name)+'">'+esc(st.name)+'</span></div>'+
-          '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttStepBarHtml_(st, offsetPx, dayPx)+todayLine+'</div>'+
+        var isHl = state.tl.highlightStep === st.id;
+        rowsHtml.push('<div class="gantt-row is-step'+(isHl?' is-highlighted':'')+'">'+
+          '<div class="gantt-label is-step" style="padding-left:'+stepIndent+'px;" data-open-entity="step:'+esc(st.id)+'"><span class="gantt-label-name" data-tip="'+esc(st.name)+'">'+esc(st.name)+'</span>'+
+          (isHl ? '<button class="icon-btn" data-clear-highlight data-tip="Clear this highlight">✕</button>' : '')+
+          '</div>'+
+          '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttStepBarHtml_(st, offsetPx, dayPx, isHl)+todayLine+'</div>'+
           '</div>');
       });
     }
@@ -4181,6 +4275,13 @@
         openEntityInfo_(parts[0], parts.slice(1).join(':'));
       });
     });
+    wrap.querySelectorAll('[data-clear-highlight]').forEach(function(btn){
+      btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        state.tl.highlightStep = null;
+        renderTimelineTree_(opts);
+      });
+    });
   }
 
   /** Read-only info card for a project/sprint/step (or, for admin, a team member row),
@@ -4191,6 +4292,9 @@
   function openEntityInfo_(kind, id){
     var body = document.getElementById('entity-info-body');
     var editBtn = document.getElementById('entity-info-edit-btn');
+    var locateBtn = document.getElementById('entity-info-locate-btn');
+    locateBtn.style.display = 'none';
+    locateBtn.onclick = null;
     var html = '';
     if(kind === 'project'){
       var p = projectById(id); if(!p) return;
@@ -4215,8 +4319,11 @@
     } else if(kind === 'step'){
       var st = state.steps.find(function(x){ return x.id===id; }); if(!st) return;
       var color = stepStatusColor(st.status);
+      var stSprint = sprintById(st.sprintId);
+      var stProjectId = st.projectId || (stSprint && stSprint.projectId);
       html = '<div class="info-kind">Step</div><div class="info-title">'+esc(st.name)+'</div>'+
-        '<div class="info-row"><span class="k">Sprint</span><span class="v">'+esc((sprintById(st.sprintId)||{}).name||'')+'</span></div>'+
+        (stProjectId ? '<div class="info-row"><span class="k">Project</span><span class="v">'+esc(projectName(stProjectId))+'</span></div>' : '')+
+        '<div class="info-row"><span class="k">Sprint</span><span class="v">'+esc((stSprint||{}).name||'')+'</span></div>'+
         '<div class="info-row"><span class="k">Dates</span><span class="v">'+fmtDateShort(st.startDate)+' – '+fmtDateShort(st.endDate)+'</span></div>'+
         (st.assignedStudent ? '<div class="info-row"><span class="k">Assigned to</span><span class="v">'+esc(st.assignedStudent)+'</span></div>' : '')+
         '<div class="info-row"><span class="k">Status</span><span class="v"><span class="status-pill" style="background:color-mix(in srgb, '+color+' 16%, transparent);color:'+color+';"><i style="background:'+color+'"></i>'+esc(st.status||'Not Started')+'</span></span></div>'+
@@ -4224,6 +4331,8 @@
         (st.notes ? '<div class="info-row"><span class="k">Notes</span><span class="v info-desc">'+esc(st.notes)+'</span></div>' : '');
       editBtn.style.display = '';
       editBtn.onclick = function(){ closeEntityInfo_(); openStepModal(id); };
+      locateBtn.style.display = '';
+      locateBtn.onclick = function(){ jumpToStepInTimeline_(id); };
     } else if(kind === 'owner'){
       var projects = state.projects.filter(function(pr){ return (pr.ownerName||'Unassigned')===id; });
       html = '<div class="info-kind">Team member</div><div class="info-title">'+esc(id)+'</div>'+
@@ -4239,6 +4348,43 @@
   document.getElementById('entity-info-close').addEventListener('click', closeEntityInfo_);
   document.getElementById('entity-info-close-btn').addEventListener('click', closeEntityInfo_);
   entityInfoOverlay.addEventListener('click', function(e){ if(e.target===entityInfoOverlay) closeEntityInfo_(); });
+
+  /** "Show in timeline" from a step's info popup (opened from a calendar bar, most often).
+   *  Closes the popup, expands whatever owner/project/sprint the step is nested under, marks
+   *  it as the highlighted step (see the .is-highlighted styling in renderTimelineTree_), lands
+   *  on the right timeline — the project's own if we're already looking at that project's
+   *  detail page, otherwise the Projects tab's summary/team timeline — and scrolls to it. The
+   *  highlight itself is cleared by the ✕ that renders on the highlighted row (data-clear-highlight),
+   *  not by this function. */
+  function jumpToStepInTimeline_(stepId){
+    var st = stepById(stepId); if(!st) return;
+    var sp = sprintById(st.sprintId);
+    var proj = projectById(st.projectId || (sp && sp.projectId));
+    closeEntityInfo_();
+    state.tl.highlightStep = stepId;
+    if(proj) state.tl.expandedProject[proj.id] = true;
+    if(sp) state.tl.expandedSprint[sp.id] = true;
+    if(proj && proj.ownerName) state.tl.expandedOwner[proj.ownerName] = true;
+
+    var wrapId;
+    if(state.view === 'project-detail' && proj && state.detailProject === proj.id){
+      renderTimelineTree_({ scope:'single', projectId: proj.id, wrapId:'pd-gantt', toolbarId:'pd-gantt-toolbar', legendId:null });
+      wrapId = 'pd-gantt';
+    } else {
+      if(state.view !== 'projects') switchView('projects');
+      // If an admin is scoped to a different person than this step's owner, the step
+      // wouldn't be visible in that narrowed view — drop the scope so it actually shows.
+      if(isAdmin() && state.projectsPersonScope && proj && state.projectsPersonScope !== proj.ownerName){
+        state.projectsPersonScope = null;
+      }
+      renderProjectsTab();
+      wrapId = 'tl-summary-gantt';
+    }
+    requestAnimationFrame(function(){
+      var row = document.querySelector('#'+wrapId+' .is-highlighted');
+      if(row) row.scrollIntoView({block:'center', behavior:'smooth'});
+    });
+  }
 
   /* ---------- Project modal (add/edit) ---------- */
   var projectOverlay = document.getElementById('project-overlay');
