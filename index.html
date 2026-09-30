@@ -593,8 +593,8 @@
   </header>
 
   <div class="banner" id="config-banner">
-    <b>Not connected yet.</b> This dashboard needs the Google Sheet API URL from your Apps Script deployment.
-    Click <b>⚙ Settings</b> above and paste the Web App URL (see <code>SETUP_GUIDE.md</code>). Until then you're looking at sample data.
+    <b>Not connected yet.</b> This dashboard needs its backend URL configured.
+    Click <b>⚙ Settings</b> above and paste it in. Until then you're looking at sample data.
   </div>
 
   <div class="stat-row" id="stat-row"></div>
@@ -940,7 +940,7 @@
     </div>
   </div>
 
-  <footer class="hint">Data lives in your team's Google Sheet — every add/edit here is saved there instantly for everyone.</footer>
+  <footer class="hint">Data lives in your team's database — every add/edit here is saved there instantly for everyone.</footer>
 </div>
 
 <div class="tooltip" id="tooltip"></div>
@@ -1002,8 +1002,8 @@
     <button class="close-x" id="settings-close">✕</button>
     <h3>Settings</h3>
     <div class="field">
-      <label>Apps Script Web App URL</label>
-      <input type="text" id="f-apiUrl" placeholder="https://script.google.com/macros/s/.../exec">
+      <label>Backend URL</label>
+      <input type="text" id="f-apiUrl" placeholder="https://YOUR-PROJECT.supabase.co/functions/v1/tracker-api">
     </div>
     <div class="meta-line" id="settings-status" style="margin-bottom:14px;"></div>
     <div class="modal-actions">
@@ -1041,7 +1041,7 @@
   <div class="modal" style="max-width:660px;">
     <button class="close-x" id="report-close">✕</button>
     <h3>Generate report</h3>
-    <p class="meta-line" style="margin:-6px 0 0;">Builds an on-brand PowerPoint summary from the sheet and downloads it. Leave a filter empty to include everything for that criterion — filters combine (e.g. a date range AND a student).</p>
+    <p class="meta-line" style="margin:-6px 0 0;">Builds an on-brand PowerPoint summary from your data and downloads it. Leave a filter empty to include everything for that criterion — filters combine (e.g. a date range AND a student).</p>
 
     <div class="field-group-label"><span>Date filters</span></div>
     <div class="row2">
@@ -1086,7 +1086,7 @@
   <div class="modal" style="max-width:480px;">
     <button class="close-x" id="wr-close">✕</button>
     <h3>Weekly Review</h3>
-    <p class="meta-line" style="margin:-6px 0 14px;">A PowerPoint meeting deck for the work week, built from the sheet:</p>
+    <p class="meta-line" style="margin:-6px 0 14px;">A PowerPoint meeting deck for the work week, built from your data:</p>
     <ul class="wr-slide-list">
       <li><span class="wr-slide-icon">👥</span><span><b style="color:var(--text-primary);">Roster</b> — everyone on the team and their focus area.</span></li>
       <li><span class="wr-slide-icon">📈</span><span><b style="color:var(--text-primary);">Last week's recap</b> — completed / on-time / not finished, with a status chart.</span></li>
@@ -1216,7 +1216,21 @@
   // Baked-in default so teammates don't have to configure anything —
   // a ?api=... URL param (if present) still overrides this, and Settings
   // can always be used to point at a different Sheet later.
-  var DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbyKDWoKveFZaNcTMk53LpFLQI41GWUNE0ZYkgHp-YMyQA0IE_yZQml5axNRKf-JFCB3/exec';
+  // Migrated off Google Sheets/Apps Script onto Supabase (Postgres + an Edge
+  // Function that mirrors the old doGet/doPost exactly) — see
+  // supabase/functions/tracker-api/index.ts. Same request/response shapes,
+  // so nothing else about how this file talks to its backend had to change.
+  var DEFAULT_API_URL = 'https://fboqrelgvzcixwoplkcu.supabase.co/functions/v1/tracker-api';
+  // Supabase's gateway requires this on every request, regardless of the
+  // app's own passphrase gate below — it's the project's public
+  // ("publishable"/anon) key, meant to be embedded in client-side code like
+  // this, same trust level as API_URL itself. It is NOT the secret that
+  // actually protects your data — that's still ADMIN_PASSPHRASE / each
+  // student's passcode, checked server-side inside the Edge Function.
+  var SUPABASE_ANON_KEY = 'sb_publishable_HHtz4wdPiBlNXkTmUOi2XA_YazfWIdR';
+  function apiHeaders(extra){
+    return Object.assign({ apikey: SUPABASE_ANON_KEY }, extra || {});
+  }
   var params = new URLSearchParams(location.search);
   var CONFIG = { API_URL: params.get('api') || DEFAULT_API_URL, KEY: '' };
 
@@ -1226,10 +1240,10 @@
   // instead, scoped to the connected sheet, so teammates don't retype it
   // every visit but it never ends up in a copy-pasted URL.
   function keyStorageName(){ return 'coopTrackerKey::' + (CONFIG.API_URL || ''); }
-  // Last-known-good snapshot of everything doGet returns, cached per-sheet (same
-  // scoping as keyStorageName above) so a returning visit can render instantly from
-  // it (see boot()/silentRefresh below) instead of showing a blank "Checking…" gate
-  // while Apps Script's own cold-start spins up.
+  // Last-known-good snapshot of everything the backend's GET returns, cached per
+  // backend URL (same scoping as keyStorageName above) so a returning visit can
+  // render instantly from it (see boot()/silentRefresh below) instead of showing a
+  // blank "Checking…" gate while the network round trip completes.
   function dataCacheStorageName(){ return 'coopTrackerCache::' + (CONFIG.API_URL || ''); }
   function saveDataCache(json){
     try{
@@ -1418,7 +1432,7 @@
         var submitted = i < 2;
         out.push({
           id: name+'-'+i, studentName:name, taskName: ['Kickoff notes','Design draft v1','API integration','Weekly report','Peer review'][i],
-          description:'Sample task for design preview — connect your Sheet to replace this with real data.',
+          description:'Sample task for design preview — connect your database to replace this with real data.',
           priority:['Low','Medium','High'][i%3], startDate: toISODate(new Date(dl.getFullYear(),dl.getMonth(),dl.getDate()-3)),
           deadline: toISODate(dl), submitTime: submitted ? new Date(dl.getFullYear(),dl.getMonth(),dl.getDate()-1).toISOString() : '',
           status: submitted ? 'Submitted' : (i===2?'In Progress':'Not Started'), notes:''
@@ -1442,7 +1456,7 @@
       renderAll();
       return Promise.resolve();
     }
-    return fetch(apiUrlWithKey()).then(function(r){return r.json();}).then(function(json){
+    return fetch(apiUrlWithKey(), {headers: apiHeaders()}).then(function(r){return r.json();}).then(function(json){
       if(json.ok){
         state.role = json.role || state.role;
         state.myName = json.studentName || '';
@@ -1461,23 +1475,23 @@
       }
       renderAll();
     }).catch(function(err){
-      showToast('Could not reach the sheet — check Settings.');
+      showToast('Could not reach the server — check Settings.');
       renderAll();
     });
   }
   function apiCall(action, payload){
     if(!CONFIG.API_URL){
-      showToast('Connect your Google Sheet first (⚙ Settings) to save changes.');
+      showToast('Connect your database first (⚙ Settings) to save changes.');
       return Promise.reject('not configured');
     }
     var body = Object.assign({action:action, key: CONFIG.KEY}, payload);
-    return fetch(CONFIG.API_URL, {method:'POST', body: JSON.stringify(body)}).then(function(r){return r.json();});
+    return fetch(CONFIG.API_URL, {method:'POST', headers: apiHeaders({'Content-Type':'application/json'}), body: JSON.stringify(body)}).then(function(r){return r.json();});
   }
 
   /* ---------- passphrase gate ---------- */
-  // The gate is a UI convenience only — Code.gs checks the passphrase on
+  // The gate is a UI convenience only — the backend checks the passphrase on
   // every request regardless, so even someone who skips this screen (e.g.
-  // by calling the raw Apps Script URL directly) gets nothing back without it.
+  // by calling the raw backend URL directly) gets nothing back without it.
   function showGateError(msg){
     document.getElementById('gate-error').textContent = msg || '';
   }
@@ -1529,7 +1543,7 @@
     var submitBtn = document.getElementById('gate-submit');
     submitBtn.disabled = true;
     CONFIG.KEY = key;
-    fetch(apiUrlWithKey()).then(function(r){return r.json();}).then(function(json){
+    fetch(apiUrlWithKey(), {headers: apiHeaders()}).then(function(r){return r.json();}).then(function(json){
       submitBtn.disabled = false;
       if(json && json.ok){
         state.role = json.role;
@@ -1553,7 +1567,7 @@
     }).catch(function(){
       submitBtn.disabled = false;
       CONFIG.KEY = '';
-      showGateError('Could not reach the sheet — check your connection and try again.');
+      showGateError('Could not reach the server — check your connection and try again.');
     });
   }
   /** Background refresh used only by the stale-while-revalidate boot path below —
@@ -1563,7 +1577,7 @@
    *  but a network hiccup just leaves the cached view showing as-is. */
   function silentRefresh(key){
     CONFIG.KEY = key;
-    fetch(apiUrlWithKey()).then(function(r){return r.json();}).then(function(json){
+    fetch(apiUrlWithKey(), {headers: apiHeaders()}).then(function(r){return r.json();}).then(function(json){
       if(json && json.ok){
         state.role = json.role || state.role;
         state.myName = json.studentName || '';
@@ -1593,8 +1607,8 @@
     var cached = loadDataCache();
     if(cached){
       // Stale-while-revalidate: render instantly from the last-known-good snapshot
-      // instead of showing a blank "Checking…" gate while Apps Script's own
-      // cold-start spins up, then quietly refresh with live data in the background.
+      // instead of showing a blank "Checking…" gate while the network round trip
+      // completes, then quietly refresh with live data in the background.
       CONFIG.KEY = stored;
       state.role = cached.role || ''; state.myName = cached.studentName || '';
       state.tasks = cached.tasks || []; state.students = cached.students || [];
@@ -2665,7 +2679,7 @@
     }).catch(function(){
       Object.assign(t, rollbackSnapshot);
       renderAll(); refreshOpenModal();
-      showToast('Could not reach the sheet — reverted. Check Settings and try again.');
+      showToast('Could not reach the server — reverted. Check Settings and try again.');
     });
   }
 
@@ -2724,7 +2738,7 @@
     }
 
     // Optimistic update: apply the change and close the modal immediately instead
-    // of waiting on the round trip to Apps Script — THAT wait, not the data itself,
+    // of waiting on the network round trip — THAT wait, not the data itself,
     // is what makes every save feel sluggish. If the save actually fails, the
     // change is rolled back and a clear toast explains that.
     var editedId = state.editingId;
@@ -2784,7 +2798,7 @@
         state.tasks = state.tasks.filter(function(x){return x!==addedRow;});
       }
       renderAll();
-      showToast('Could not reach the sheet — your change was undone. Check Settings and try again.');
+      showToast('Could not reach the server — your change was undone. Check Settings and try again.');
     });
   });
 
@@ -2814,7 +2828,7 @@
     }).catch(function(){
       if(removedRow) state.tasks.splice(Math.min(removedIdx, state.tasks.length), 0, removedRow);
       renderAll();
-      showToast('Could not reach the sheet — the task was restored. Check Settings and try again.');
+      showToast('Could not reach the server — the task was restored. Check Settings and try again.');
     });
   });
 
@@ -2834,12 +2848,12 @@
     var url = document.getElementById('f-apiUrl').value.trim();
     var statusEl = document.getElementById('settings-status');
     if(!url){ statusEl.textContent = 'Enter a URL first.'; return; }
-    if(!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(url)){
-      statusEl.textContent = '⚠ That doesn\'t look like an Apps Script /exec URL — it should start with https://script.google.com/macros/s/ and end in /exec. Re-copy it from Deploy → Manage deployments.';
+    if(!/^https:\/\/[a-z0-9-]+\.supabase\.co\/functions\/v1\/[A-Za-z0-9_-]+$/.test(url)){
+      statusEl.textContent = '⚠ That doesn\'t look like a Supabase Edge Function URL — it should look like https://YOUR-PROJECT.supabase.co/functions/v1/tracker-api. Copy it from Edge Functions → tracker-api in your Supabase project.';
       return;
     }
     statusEl.textContent = 'Testing…';
-    fetch(url).then(function(r){
+    fetch(url, {headers: apiHeaders()}).then(function(r){
       return r.text().then(function(text){ return {status:r.status, text:text}; });
     }).then(function(res){
       var json = null;
@@ -2849,14 +2863,14 @@
       } else if(json && json.ok === false && isAuthError(json)){
         statusEl.textContent = '✓ Reachable and passphrase-protected (that\'s expected here — this test doesn\'t send a passphrase). Save & connect, then unlock with your team passphrase on the dashboard.';
       } else if(json && json.ok === false){
-        statusEl.textContent = '✕ Sheet returned an error: ' + json.error;
-      } else if(/accounts\.google\.com|<html/i.test(res.text)){
-        statusEl.textContent = '✕ Got a Google sign-in/HTML page instead of data (HTTP '+res.status+'). This almost always means the deployment\'s "Who has access" isn\'t actually set to "Anyone" — redeploy (Deploy → Manage deployments → edit → Anyone) or make sure you completed the permission-approval prompt during deploy.';
+        statusEl.textContent = '✕ Server returned an error: ' + json.error;
+      } else if(res.status === 401){
+        statusEl.textContent = '✕ Unauthorized (HTTP 401). Double-check the URL was copied correctly, and that ADMIN_PASSPHRASE is set in that function\'s secrets.';
       } else {
-        statusEl.textContent = '✕ Unexpected response (HTTP '+res.status+'). Paste the URL directly into a new browser tab — it should show plain JSON like {"ok":true,"tasks":[]}. If it doesn\'t, the deployment needs fixing.';
+        statusEl.textContent = '✕ Unexpected response (HTTP '+res.status+'). Check the function\'s Logs tab in Supabase for the actual error.';
       }
     }).catch(function(err){
-      statusEl.textContent = '✕ Network/CORS error reaching that URL. If you opened this file directly from your computer (a file:// address in the browser bar), some browsers block this kind of request — host the page first (e.g. Netlify Drop) and test again from there. Otherwise, paste the URL into a new browser tab directly to confirm it returns JSON.';
+      statusEl.textContent = '✕ Network/CORS error reaching that URL. If you opened this file directly from your computer (a file:// address in the browser bar), some browsers block this kind of request — host the page first (e.g. Netlify Drop) and test again from there.';
     });
   });
 
@@ -3092,7 +3106,7 @@
     document.getElementById(id).addEventListener('change', updateReportFilterCount);
   });
   function openReportModal(){
-    if(!CONFIG.API_URL){ showToast('Connect your Google Sheet first (⚙ Settings) to generate a report.'); return; }
+    if(!CONFIG.API_URL){ showToast('Connect your database first (⚙ Settings) to generate a report.'); return; }
     REPORT_FILTER_FIELD_IDS.forEach(function(id){
       document.getElementById(id).value = '';
     });
@@ -3135,7 +3149,7 @@
     setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
   }
   function generateReport(){
-    if(SAMPLE){ showToast('Connect your Google Sheet first (⚙ Settings) — reports are built server-side from the real data.'); return; }
+    if(SAMPLE){ showToast('Connect your database first (⚙ Settings) — reports are built server-side from the real data.'); return; }
     var btn = document.getElementById('btn-generate-report');
     btn.disabled = true;
     setReportStatus('Building your report — this can take a few seconds…', 'busy');
@@ -3149,7 +3163,7 @@
       setReportStatus('Downloaded '+(res.filename||'coop-report.pptx')+' — '+(res.taskCount!=null?res.taskCount:'')+' task(s) included.', 'ok');
     }).catch(function(){
       btn.disabled = false;
-      setReportStatus('Could not reach the sheet — check Settings and try again.', 'error');
+      setReportStatus('Could not reach the server — check Settings and try again.', 'error');
     });
   }
   document.getElementById('btn-report').addEventListener('click', openReportModal);
@@ -3187,7 +3201,7 @@
       '<div class="wrb-col"><span class="wrb-label">This week</span><span class="wrb-dates">'+fmtDateShort(bounds.thisStart)+' – '+fmtDateShort(bounds.thisEnd)+'</span></div>';
   }
   function openWrModal(){
-    if(!CONFIG.API_URL){ showToast('Connect your Google Sheet first (⚙ Settings) to build the Weekly Review.'); return; }
+    if(!CONFIG.API_URL){ showToast('Connect your database first (⚙ Settings) to build the Weekly Review.'); return; }
     var auto = computeWorkWeekBounds(new Date());
     renderWrBoundsPreview(auto);
     document.getElementById('wr-manual-check').checked = false;
@@ -3214,7 +3228,7 @@
     };
   }
   function generateWeeklyReview(){
-    if(SAMPLE){ showToast('Connect your Google Sheet first (⚙ Settings) — the Weekly Review is built server-side from the real data.'); return; }
+    if(SAMPLE){ showToast('Connect your database first (⚙ Settings) — the Weekly Review is built server-side from the real data.'); return; }
     var manual = document.getElementById('wr-manual-check').checked;
     var bounds = null;
     if(manual){
@@ -3238,7 +3252,7 @@
       setWrStatus('Downloaded '+(res.filename||'weekly-review.pptx')+' — '+(res.studentCount!=null?res.studentCount+' team member(s), ':'')+(res.lastWeekTaskCount!=null?res.lastWeekTaskCount+' task(s) last week, ':'')+(res.upcomingTaskCount!=null?res.upcomingTaskCount+' due this week.':''), 'ok');
     }).catch(function(){
       btn.disabled = false;
-      setWrStatus('Could not reach the sheet — check Settings and try again.', 'error');
+      setWrStatus('Could not reach the server — check Settings and try again.', 'error');
     });
   }
   document.getElementById('btn-weekly-review').addEventListener('click', openWrModal);
@@ -4064,7 +4078,7 @@
       return;
     }
     // Optimistic: apply immediately and jump straight into the (new or edited)
-    // project's detail page instead of waiting on the round trip to Apps Script —
+    // project's detail page instead of waiting on the network round trip —
     // rolled back automatically if the save actually fails.
     var editedId = state.editingProjectId;
     var rollbackSnapshot = null, addedRow = null;
@@ -4119,7 +4133,7 @@
         state.projects = state.projects.filter(function(x){return x!==addedRow;});
         switchView('projects'); renderProjectsTab();
       }
-      showToast('Could not reach the sheet — your change was undone. Check Settings and try again.');
+      showToast('Could not reach the server — your change was undone. Check Settings and try again.');
     });
   });
   document.getElementById('btn-delete-project').addEventListener('click', function(){
@@ -4159,7 +4173,7 @@
       removedSprints.forEach(function(s){ state.sprints.push(s); });
       removedSteps.forEach(function(s){ state.steps.push(s); });
       renderProjectsTab();
-      showToast('Could not reach the sheet — the project was restored. Check Settings and try again.');
+      showToast('Could not reach the server — the project was restored. Check Settings and try again.');
     });
   });
 
@@ -4241,7 +4255,7 @@
         state.sprints = state.sprints.filter(function(x){return x!==addedRow;});
       }
       renderProjectDetail(); renderProjectsTab();
-      showToast('Could not reach the sheet — your change was undone. Check Settings and try again.');
+      showToast('Could not reach the server — your change was undone. Check Settings and try again.');
     });
   });
   document.getElementById('btn-delete-sprint').addEventListener('click', function(){
@@ -4275,7 +4289,7 @@
       state.sprints.push(removedSprint);
       removedSteps.forEach(function(s){ state.steps.push(s); });
       renderProjectDetail(); renderProjectsTab();
-      showToast('Could not reach the sheet — the sprint was restored. Check Settings and try again.');
+      showToast('Could not reach the server — the sprint was restored. Check Settings and try again.');
     });
   });
 
@@ -4362,7 +4376,7 @@
         state.steps = state.steps.filter(function(x){return x!==addedRow;});
       }
       renderProjectDetail(); renderProjectsTab();
-      showToast('Could not reach the sheet — your change was undone. Check Settings and try again.');
+      showToast('Could not reach the server — your change was undone. Check Settings and try again.');
     });
   });
   document.getElementById('btn-delete-step').addEventListener('click', function(){
@@ -4390,7 +4404,7 @@
     }).catch(function(){
       state.steps.push(removedStep);
       renderProjectDetail(); renderProjectsTab();
-      showToast('Could not reach the sheet — the step was restored. Check Settings and try again.');
+      showToast('Could not reach the server — the step was restored. Check Settings and try again.');
     });
   });
 
