@@ -500,13 +500,9 @@
   .gantt-label.is-step{color:var(--text-secondary);padding-left:22px;}
   .gantt-label.is-project{font-weight:700;color:var(--text-primary);background:var(--surface-1);cursor:pointer;}
   .gantt-label.is-project:hover{background:var(--page);}
-  .gantt-label.is-nested{padding-left:22px;cursor:pointer;}
-  .gantt-label.is-nested:hover{background:var(--page);}
-  .gantt-label.is-step.is-nested{padding-left:38px;}
   .gantt-label-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .gantt-track{position:relative;flex:1;min-height:34px;}
   .gantt-row.is-sprint .gantt-track{background:var(--page);}
-  .gantt-row.is-project .gantt-track{background:var(--surface-1);}
   .gantt-bar{position:absolute;top:7px;height:20px;border-radius:4px;cursor:pointer;
     display:flex;align-items:center;overflow:hidden;transition:filter .1s;}
   .gantt-bar:hover{filter:brightness(1.08);}
@@ -516,12 +512,8 @@
   .gantt-bar.is-pill{border-radius:999px;}
   .gantt-bar-handle{position:absolute;right:3px;top:50%;transform:translateY(-50%);width:13px;height:13px;
     border-radius:50%;background:rgba(255,255,255,.55);}
-  .gantt-label.is-member{font-weight:700;color:var(--text-primary);background:var(--surface-1);cursor:pointer;}
-  .gantt-label.is-member:hover{background:var(--page);}
-  .gantt-row.is-member .gantt-track{background:var(--surface-1);}
-  .gantt-row.is-sprint.is-clickable{cursor:pointer;}
-  .gantt-row.is-sprint.is-clickable:hover .gantt-track{background:var(--gridline);}
-  .gantt-open-btn{align-self:center;margin-right:10px;white-space:nowrap;flex-shrink:0;}
+  .gantt-row.is-clickable{cursor:pointer;}
+  .gantt-row.is-clickable:hover .gantt-track{background:var(--gridline);}
 
   /* Gantt toolbar (search / status filter / person filter / zoom) — shared by the
      per-project Gantt and admin's combined timeline. */
@@ -569,6 +561,48 @@
     .project-grid{grid-template-columns:1fr 1fr;}
     .gantt-label{width:150px;}
     .gantt-label.is-step{padding-left:14px;}
+  }
+
+  /* ---------- timeline drag-to-pan + entity info popup ---------- */
+  .gantt-wrap.is-pannable{cursor:grab;}
+  .gantt-wrap.is-pannable.is-dragging{cursor:grabbing;user-select:none;}
+  .gantt-label.is-owner{font-weight:700;color:var(--text-primary);background:var(--surface-1);cursor:pointer;}
+  .gantt-label.is-owner:hover{background:var(--page);}
+  .gantt-row.is-owner .gantt-track{background:var(--surface-1);}
+  .gantt-label.is-project{cursor:pointer;}
+  .gantt-bar.is-project-bar{height:14px;top:9px;opacity:.92;}
+  #entity-info-overlay .modal{max-width:400px;}
+  .info-kind{font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--series-1);margin-bottom:4px;}
+  .info-title{font-size:16.5px;font-weight:700;margin:0 0 10px;line-height:1.3;}
+  .info-row{display:flex;justify-content:space-between;gap:14px;font-size:12.5px;padding:8px 0;border-top:1px solid var(--gridline);}
+  .info-row .k{color:var(--text-muted);flex-shrink:0;}
+  .info-row .v{color:var(--text-primary);font-weight:600;text-align:right;}
+  .info-row .v.info-desc{font-weight:400;white-space:pre-wrap;}
+
+  /* ---------- calendar: multi-day spanning bars (Projects tab + single-project calendar
+     only — scoped under .cal-grid-span so the unrelated Overview month-calendar, which
+     shares the plain .cal-grid/.cal-day classes, is never affected). A seamless bordered
+     grid (gap:1px hairlines) replaces the individually-carded .cal-day so a bar can visibly
+     run across several days in one continuous strip. */
+  .cal-grid-span{gap:1px;background:var(--gridline);border:1px solid var(--gridline);border-radius:8px;overflow:hidden;}
+  .cal-grid-span .cal-dow{background:var(--surface-1);padding:6px 0;margin:0;}
+  .cal-grid-span .cal-day{min-height:0;border-radius:0;border:none;background:var(--page);padding:5px 5px 4px;position:relative;}
+  .cal-grid-span .cal-day.cal-has-tasks{background:var(--surface-1);}
+  .cal-grid-span .cal-day.cal-outside{opacity:1;background:var(--page);}
+  .cal-grid-span .cal-day.cal-outside .cal-daynum{color:var(--text-muted);}
+  .cal-grid-span .cal-day.cal-today{border:none;}
+  .cal-grid-span .cal-day.cal-today .cal-daynum{background:var(--series-1);color:#fff;border-radius:50%;
+    width:18px;height:18px;display:flex;align-items:center;justify-content:center;}
+  .cal-week{grid-column:1/-1;display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--gridline);position:relative;}
+  .cal-span-bars{position:absolute;left:0;right:0;top:24px;bottom:4px;padding:0 2px;}
+  .cal-span-bar{position:absolute;height:16px;border-radius:4px;display:flex;align-items:center;gap:4px;
+    overflow:hidden;cursor:pointer;top:0;}
+  .cal-span-bar span{font-size:10px;font-weight:650;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:4px;}
+  .cal-span-bar .av{width:12px;height:12px;border-radius:50%;background:rgba(255,255,255,.32);color:#fff;font-size:7px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:3px;}
+  @media (max-width:760px){
+    .cal-span-bar{height:13px;}
+    .cal-span-bar span{font-size:8.5px;}
   }
 </style>
 </head>
@@ -794,7 +828,25 @@
 
     <div class="stat-row stat-row-4" id="proj-stat-row" style="margin-bottom:22px;"></div>
 
-    <div class="section-head" style="margin-top:4px;">
+    <!-- Combined timeline across every project visible to this login — just this member's
+         own projects, or (admin) every member's, grouped by owner first. Same drill-down
+         behavior as a single project's own Timeline below (see renderTimelineTree_). -->
+    <div class="card-panel" id="tl-summary-panel" style="margin-top:4px;">
+      <div class="section-head" style="margin:0 0 12px;"><h2 id="tl-summary-title">Summary timeline</h2></div>
+      <div id="tl-summary-toolbar"></div>
+      <div class="gantt-wrap" id="tl-summary-gantt"></div>
+      <div class="gantt-legend" id="tl-summary-project-legend" style="margin-top:10px;"></div>
+      <div class="gantt-legend" style="margin-top:4px;">
+        <span><i class="dot" style="background:var(--text-muted);"></i>Not Started</span>
+        <span><i class="dot" style="background:var(--status-info);"></i>In Progress</span>
+        <span><i class="dot" style="background:var(--series-1);"></i>Submitted</span>
+        <span><i class="dot" style="background:var(--status-good);"></i>Approved</span>
+        <span><i class="dot" style="background:var(--status-critical);"></i>Blocked</span>
+        <span>&nbsp;·&nbsp;click a name or bar to expand it · click-drag the timeline to pan</span>
+      </div>
+    </div>
+
+    <div class="section-head" style="margin-top:22px;">
       <h2>All steps calendar</h2>
       <div class="nav-week">
         <button class="nav-arrow" id="proj-cal-prev">‹</button>
@@ -804,9 +856,9 @@
       </div>
     </div>
     <div class="card-panel">
-      <div class="cal-grid" id="proj-calendar"></div>
+      <div class="cal-grid cal-grid-span" id="proj-calendar"></div>
       <div class="heat-legend" style="flex-wrap:wrap;margin-top:12px;">
-        <span>&nbsp;·&nbsp; each dot is a step due that day, colored by its project — click or hover a day for details</span>
+        <span>&nbsp;·&nbsp; each bar spans the days a step is due, colored by its project — click a bar for details</span>
       </div>
     </div>
 
@@ -815,24 +867,6 @@
       <div class="donut-row">
         <div class="donut-wrap" id="proj-pie"></div>
         <div class="donut-legend" id="proj-pie-legend"></div>
-      </div>
-    </div>
-
-    <!-- Admin-only: a combined Project -> Sprint -> Step timeline across every member's
-         projects, toggled on/off in renderProjectsTab() by isAdmin(). Members never see
-         this — their own doGet response only ever contains their own projects anyway. -->
-    <div class="card-panel" id="admin-timeline-panel" style="display:none;margin-top:22px;">
-      <div class="section-head" style="margin:0 0 12px;"><h2>All projects — combined timeline</h2></div>
-      <div id="admin-timeline-toolbar"></div>
-      <div class="gantt-wrap" id="admin-timeline-gantt"></div>
-      <div class="gantt-legend" id="admin-timeline-project-legend" style="margin-top:10px;"></div>
-      <div class="gantt-legend" style="margin-top:4px;">
-        <span><i class="dot" style="background:var(--text-muted);"></i>Not Started</span>
-        <span><i class="dot" style="background:var(--status-info);"></i>In Progress</span>
-        <span><i class="dot" style="background:var(--series-1);"></i>Submitted</span>
-        <span><i class="dot" style="background:var(--status-good);"></i>Approved</span>
-        <span><i class="dot" style="background:var(--status-critical);"></i>Blocked</span>
-        <span>&nbsp;·&nbsp;click a sprint to show its steps · ↗ opens that project to edit</span>
       </div>
     </div>
 
@@ -871,6 +905,22 @@
       <span><i style="background:var(--status-good)"></i>Approved</span>
       <span><i style="background:var(--status-critical)"></i>Blocked</span>
       <span><i style="border:1.5px dashed var(--text-muted);background:transparent;"></i>Sprint span</span>
+    </div>
+
+    <div class="section-head" style="margin-top:22px;">
+      <h2>Calendar</h2>
+      <div class="nav-week">
+        <button class="nav-arrow" id="pd-cal-prev">‹</button>
+        <span class="lbl" id="pd-cal-label">Month</span>
+        <button class="nav-arrow" id="pd-cal-next">›</button>
+        <button class="btn btn-ghost" id="pd-cal-today" style="padding:5px 10px;">This month</button>
+      </div>
+    </div>
+    <div class="card-panel">
+      <div class="cal-grid cal-grid-span" id="pd-calendar"></div>
+      <div class="heat-legend" style="flex-wrap:wrap;margin-top:12px;">
+        <span>&nbsp;·&nbsp; each bar spans the days a step is due — click a bar for details</span>
+      </div>
     </div>
 
     <div class="card-panel" id="pd-notes-panel" style="margin-top:22px;">
@@ -1195,6 +1245,21 @@
   </div>
 </div>
 
+<!-- Read-only "info card" shown when a project/sprint/step is clicked anywhere in a
+     timeline or calendar — see openEntityInfo_(). Its own Edit button hands off to the
+     real edit modal (openProjectModal/openSprintModal/openStepModal) so editing always
+     goes through the one already-battle-tested form per type. -->
+<div class="overlay" id="entity-info-overlay">
+  <div class="modal">
+    <button class="close-x" id="entity-info-close">✕</button>
+    <div id="entity-info-body"></div>
+    <div class="modal-actions">
+      <button class="btn" id="entity-info-close-btn">Close</button>
+      <button class="btn btn-primary" id="entity-info-edit-btn">Edit</button>
+    </div>
+  </div>
+</div>
+
 <!-- Passphrase gate — blocks the dashboard until a valid member/admin passphrase is entered.
      Enforced again server-side in Code.gs, so this screen alone isn't the real security
      boundary — it's just the UI half of it. -->
@@ -1268,24 +1333,22 @@
   var SAMPLE = !CONFIG.API_URL;
   var state = { tasks: [], students: [], role: '', myName: '', selectedWeek: weekKey(new Date()), selectedMonth: todayMonth(), editingId: null, view: 'overview',
     detailStudent: null, studentDetailFrom: 'overview',
-    projects: [], sprints: [], steps: [], detailProject: null, projectsCalMonth: todayMonth(),
+    projects: [], sprints: [], steps: [], detailProject: null, projectsCalMonth: todayMonth(), pdCalMonth: todayMonth(),
     editingProjectId: null, editingSprintId: null, editingStepId: null, stepSprintContext: null,
-    collapsedSprints: {}, collapsedProjects: {},
     // Search/sort state for the "All projects" card grid (see renderProjectCards below).
     projectsUi: { search: '', sort: 'name' },
-    // Admin's combined timeline (renderAdminTimeline) has its own independent fold
-    // state, deliberately separate from collapsedSprints/collapsedProjects above (which
-    // belong to the per-project Gantt) so toggling one view never affects the other.
-    // A sprint here starts collapsed (id absent) — expandedAdminSprints[id] === true is
-    // the one that means "showing its steps."
-    collapsedAdminMembers: {}, expandedAdminSprints: {},
-    // Toolbar state for the two Gantt views (search / status filter / zoom) — kept
-    // separate per view so filtering the combined admin timeline never affects a
-    // member's own project view and vice versa. autoFit:true means "compute the
+    // One shared fold state for every timeline tree (the per-project Timeline, the
+    // member's own Summary timeline, and admin's Team timeline) — see renderTimelineTree_.
+    // Everything starts collapsed; sprint/step ids are globally unique so a sprint expanded
+    // in one view stays expanded if you reach it again from another.
+    tl: { expandedOwner: {}, expandedProject: {}, expandedSprint: {} },
+    // Toolbar state for the timeline views (search / status filter / zoom) — "project" is
+    // the per-project Timeline, "summary" is the combined Summary/Team timeline, kept
+    // separate so filtering one never affects the other. autoFit:true means "compute the
     // day-width to fit the visible width" instead of using a fixed scale preset.
     ganttUi: {
       project: { search: '', status: {}, scale: 'weeks', zoom: 1, autoFit: true },
-      admin: { search: '', status: {}, person: {}, scale: 'weeks', zoom: 1, autoFit: true }
+      summary: { search: '', status: {}, person: {}, scale: 'weeks', zoom: 1, autoFit: true }
     } };
   /** True when signed in with a personal (student) passcode rather than the admin passphrase
    *  or sample/demo mode — the dashboard is scoped to just this one person's data. */
@@ -3353,8 +3416,9 @@
     renderProjectCards();
     renderProjectsPie();
     renderProjectsCalendar();
-    document.getElementById('admin-timeline-panel').style.display = isAdmin() ? '' : 'none';
-    if(isAdmin()) renderAdminTimeline();
+    document.getElementById('tl-summary-title').textContent = isAdmin() ? 'Team timeline' : 'Summary timeline';
+    renderTimelineTree_({ scope: isAdmin() ? 'team' : 'mine',
+      wrapId: 'tl-summary-gantt', toolbarId: 'tl-summary-toolbar', legendId: 'tl-summary-project-legend' });
   }
   /** Quick-glance stat strip at the top of the Projects tab — active project count, plus
    *  open/due-this-week/overdue steps as proportions (see statMeterTile), so the state of
@@ -3506,10 +3570,15 @@
       return '<span class="donut-legend-item"><i class="dot" style="background:'+projectColor(p.id)+'"></i>'+esc(p.name)+'<b>'+stepsForProject(p.id).length+'</b></span>';
     }).join('') : '<span class="muted" style="font-size:12.5px;">No projects yet.</span>';
   }
-  /** Cross-project month calendar of every step's due date (endDate) — exact same grid-building
-   *  technique as renderMonthlyCalendar(), with dots colored by project instead of by urgency. */
-  function renderProjectsCalendar(){
-    var first = new Date(state.projectsCalMonth+'-01T00:00:00');
+  /** Shared multi-day spanning-bar calendar — used by both the all-projects calendar on the
+   *  Projects tab and a single project's own calendar on its detail page. Each visible week
+   *  gets its own lane-stacked set of bars (one bar per step per week it touches, clipped to
+   *  that week and positioned by simple day-fraction percentages) so two steps active at once
+   *  never collide, and a step spanning several days reads as one continuous bar instead of a
+   *  dot per day. opts: {calId, labelId, todayBtnId, monthKey, steps, showAvatar}. */
+  function renderSpanningCalendar_(opts){
+    var monthYm = state[opts.monthKey];
+    var first = new Date(monthYm+'-01T00:00:00');
     var gridStart = new Date(first); gridStart.setDate(gridStart.getDate() - gridStart.getDay());
     var days = [];
     for(var i=0;i<42;i++){ var d = new Date(gridStart); d.setDate(gridStart.getDate()+i); days.push(d); }
@@ -3519,60 +3588,113 @@
       if(allOutside) days = days.slice(0, days.length-7); else break;
     }
     var todayIso = todayISO();
-    var dowLbls = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    var header = dowLbls.map(function(l){ return '<div class="cal-dow">'+l+'</div>'; }).join('');
-    var cells = days.map(function(d){
-      var iso = toISODate(d);
-      var outside = d.getMonth() !== first.getMonth();
-      var isToday = iso === todayIso;
-      var daySteps = state.steps.filter(function(s){ return s.endDate===iso; });
-      var dots = daySteps.slice(0,8).map(function(s){
-        return '<span class="cal-dot" style="background:'+projectColor(s.projectId)+'"></span>';
+    var header = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(function(l){ return '<div class="cal-dow">'+l+'</div>'; }).join('');
+
+    var steps = (opts.steps||[]).filter(function(s){ return s.startDate && s.endDate; });
+    var weeks = [];
+    for(var w=0; w<days.length; w+=7) weeks.push(days.slice(w,w+7));
+
+    var weeksHtml = weeks.map(function(week){
+      var weekStartIso = toISODate(week[0]), weekEndIso = toISODate(week[6]);
+      var dayCellsHtml = week.map(function(d){
+        var iso = toISODate(d);
+        var outside = d.getMonth() !== first.getMonth();
+        var isToday = iso === todayIso;
+        var tip = d.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'});
+        return '<div class="cal-day'+(outside?' cal-outside':'')+(isToday?' cal-today':'')+'" '+
+          'data-tip="'+esc(tip)+' — click for the full list" data-cal-day="'+iso+'" tabindex="0" role="button" aria-label="'+esc(tip)+'">'+
+          '<div class="cal-daynum">'+d.getDate()+'</div></div>';
       }).join('');
-      var overflow = daySteps.length > 8 ? '<span class="cal-more">+'+(daySteps.length-8)+'</span>' : '';
-      var tip = d.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'}) +
-        (daySteps.length ? ': ' + daySteps.length + ' step'+(daySteps.length===1?'':'s')+' due — click for details' : ': no steps due');
-      return '<div class="cal-day'+(outside?' cal-outside':'')+(isToday?' cal-today':'')+(daySteps.length?' cal-has-tasks':'')+'" '+
-        'data-tip="'+esc(tip)+'" data-day="'+iso+'" tabindex="0" role="button" aria-label="'+esc(tip)+'">'+
-        '<div class="cal-daynum">'+d.getDate()+'</div>'+
-        '<div class="cal-dots">'+dots+overflow+'</div>'+
-        '</div>';
+
+      var overlapping = steps.filter(function(s){ return s.startDate<=weekEndIso && s.endDate>=weekStartIso; })
+        .sort(function(a,b){ return a.startDate.localeCompare(b.startDate); });
+      var lanes = [];
+      overlapping.forEach(function(s){
+        var placed = false;
+        for(var li=0; li<lanes.length; li++){
+          if(lanes[li] <= s.startDate){ lanes[li] = s.endDate; s.__lane = li; placed = true; break; }
+        }
+        if(!placed){ lanes.push(s.endDate); s.__lane = lanes.length-1; }
+      });
+      var barsHtml = overlapping.map(function(s){
+        var clipStart = s.startDate < weekStartIso ? weekStartIso : s.startDate;
+        var clipEnd = s.endDate > weekEndIso ? weekEndIso : s.endDate;
+        var colStart = daysBetweenIso(weekStartIso, clipStart);
+        var colSpan = daysBetweenIso(clipStart, clipEnd) + 1;
+        var leftPct = (colStart/7)*100, widthPct = (colSpan/7)*100;
+        var owner = opts.showAvatar ? (projectById(s.projectId)||{}).ownerName : '';
+        var av = owner ? '<span class="av" data-tip="'+esc(owner)+'">'+esc(owner.trim().charAt(0).toUpperCase())+'</span>' : '';
+        var tip = esc(s.name)+' · '+esc(s.status||'Not Started')+' · '+fmtDateShort(s.startDate)+' – '+fmtDateShort(s.endDate);
+        return '<div class="cal-span-bar" data-open-entity="step:'+esc(s.id)+'" data-tip="'+tip+'" '+
+          'style="left:calc('+leftPct+'% + 2px);width:calc('+widthPct+'% - 4px);top:'+(s.__lane*18)+'px;background:'+projectColor(s.projectId)+';">'+av+'<span>'+esc(s.name)+'</span></div>';
+      }).join('');
+      var rowHeight = Math.max(58, 24 + lanes.length*18 + 8);
+      return '<div class="cal-week" style="min-height:'+rowHeight+'px;">'+dayCellsHtml+
+        '<div class="cal-span-bars">'+barsHtml+'</div></div>';
     }).join('');
-    var el = document.getElementById('proj-calendar');
-    el.innerHTML = header + cells;
+
+    var el = document.getElementById(opts.calId);
+    el.innerHTML = header + weeksHtml;
     bindTooltips(el);
-    document.getElementById('proj-cal-label').textContent = first.toLocaleDateString(undefined,{month:'long',year:'numeric'});
-    document.getElementById('proj-cal-today').toggleAttribute('hidden', state.projectsCalMonth === todayMonth());
-    el.querySelectorAll('[data-day]').forEach(function(cell){
-      cell.addEventListener('click', function(){ openProjDayDetail(cell.getAttribute('data-day')); });
-      cell.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openProjDayDetail(cell.getAttribute('data-day')); } });
+    document.getElementById(opts.labelId).textContent = first.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+    if(opts.todayBtnId) document.getElementById(opts.todayBtnId).toggleAttribute('hidden', monthYm === todayMonth());
+    el.querySelectorAll('[data-cal-day]').forEach(function(cell){
+      cell.addEventListener('click', function(){ openProjDayDetail(cell.getAttribute('data-cal-day'), steps); });
+      cell.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openProjDayDetail(cell.getAttribute('data-cal-day'), steps); } });
     });
+    el.querySelectorAll('[data-open-entity]').forEach(function(bar){
+      bar.addEventListener('click', function(e){
+        e.stopPropagation();
+        var parts = bar.getAttribute('data-open-entity').split(':');
+        openEntityInfo_(parts[0], parts.slice(1).join(':'));
+      });
+    });
+  }
+  function renderProjectsCalendar(){
+    renderSpanningCalendar_({ calId: 'proj-calendar', labelId: 'proj-cal-label', todayBtnId: 'proj-cal-today',
+      monthKey: 'projectsCalMonth', steps: state.steps, showAvatar: isAdmin() });
+  }
+  function renderPdCalendar_(){
+    renderSpanningCalendar_({ calId: 'pd-calendar', labelId: 'pd-cal-label', todayBtnId: 'pd-cal-today',
+      monthKey: 'pdCalMonth', steps: stepsForProject(state.detailProject), showAvatar: false });
   }
   document.getElementById('proj-cal-prev').addEventListener('click', function(){ state.projectsCalMonth = shiftMonth(state.projectsCalMonth,-1); renderProjectsCalendar(); });
   document.getElementById('proj-cal-next').addEventListener('click', function(){ state.projectsCalMonth = shiftMonth(state.projectsCalMonth,1); renderProjectsCalendar(); });
   document.getElementById('proj-cal-today').addEventListener('click', function(){ state.projectsCalMonth = todayMonth(); renderProjectsCalendar(); });
+  document.getElementById('pd-cal-prev').addEventListener('click', function(){ state.pdCalMonth = shiftMonth(state.pdCalMonth,-1); renderPdCalendar_(); });
+  document.getElementById('pd-cal-next').addEventListener('click', function(){ state.pdCalMonth = shiftMonth(state.pdCalMonth,1); renderPdCalendar_(); });
+  document.getElementById('pd-cal-today').addEventListener('click', function(){ state.pdCalMonth = todayMonth(); renderPdCalendar_(); });
 
+  /** The day-detail overlay opened by clicking a day NUMBER (as opposed to a bar) on either
+   *  spanning calendar — still useful when a week gets too dense for its bars to show every
+   *  title. `stepsPool` scopes the list to whichever calendar was clicked (all steps, or just
+   *  one project's) so the per-project calendar's day list never leaks other projects' steps. */
   var projDayOverlay = document.getElementById('proj-day-overlay');
-  function openProjDayDetail(iso){
+  function openProjDayDetail(iso, stepsPool){
     if(!iso) return;
+    var pool = stepsPool || state.steps;
     var d = parseDate(iso);
     document.getElementById('proj-day-title').textContent = d ? d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}) : iso;
-    var daySteps = state.steps.filter(function(s){ return s.endDate===iso; })
+    var daySteps = pool.filter(function(s){ return s.startDate && s.endDate && s.startDate<=iso && s.endDate>=iso; })
       .sort(function(a,b){ return projectName(a.projectId).localeCompare(projectName(b.projectId)); });
     var list = document.getElementById('proj-day-list');
     if(!daySteps.length){
-      list.innerHTML = '<div class="muted" style="padding:14px 4px;">No steps due this day.</div>';
+      list.innerHTML = '<div class="muted" style="padding:14px 4px;">No steps active this day.</div>';
     } else {
       list.innerHTML = daySteps.map(function(s){
-        return '<div class="day-task-row" data-pid="'+esc(s.projectId)+'">'+
+        return '<div class="day-task-row" data-open-entity="step:'+esc(s.id)+'">'+
           '<span class="project-dot" style="background:'+projectColor(s.projectId)+';width:20px;height:20px;flex-shrink:0;"></span>'+
           '<div class="day-task-main"><div class="day-task-name">'+esc(s.name||'(untitled step)')+'</div>'+
           '<div class="day-task-student">'+esc(projectName(s.projectId))+(s.assignedStudent?' · '+esc(s.assignedStudent):'')+'</div></div>'+
           '<span class="badge"><i class="dot" style="background:'+stepStatusColor(s.status)+'"></i>'+esc(s.status||'Not Started')+'</span>'+
           '</div>';
       }).join('');
-      list.querySelectorAll('[data-pid]').forEach(function(row){
-        row.addEventListener('click', function(){ closeProjDayDetail(); openProjectDetail(row.getAttribute('data-pid')); });
+      list.querySelectorAll('[data-open-entity]').forEach(function(row){
+        row.addEventListener('click', function(){
+          closeProjDayDetail();
+          var parts = row.getAttribute('data-open-entity').split(':');
+          openEntityInfo_(parts[0], parts.slice(1).join(':'));
+        });
       });
     }
     projDayOverlay.classList.add('show');
@@ -3599,7 +3721,10 @@
     document.getElementById('pd-desc').textContent = p.description || '';
     document.getElementById('pd-notes').textContent = p.notes || 'No notes.';
     renderProjectDetailStats(p);
-    renderGantt(id);
+    renderTimelineTree_({ scope: 'single', projectId: id,
+      wrapId: 'pd-gantt', toolbarId: 'pd-gantt-toolbar', legendId: null });
+    renderSpanningCalendar_({ calId: 'pd-calendar', labelId: 'pd-cal-label', monthKey: 'pdCalMonth',
+      steps: stepsForProject(id), showAvatar: false });
   }
   /** The header stats bar on a project's detail page — a Monday-style "group summary"
    *  row: status pill, date span + day count, sprint/step counts, and an overall
@@ -3691,7 +3816,7 @@
     var left = offsetPx(stStart), w = Math.max(6, dayPx, (daysBetweenIso(stStart,stEnd)+1)*dayPx);
     var label = w > 56 ? '<span class="gantt-bar-label">'+esc(st.name)+'</span>' : '';
     var tip = esc(st.name)+' · '+esc(st.status||'Not Started')+(st.assignedStudent?' · '+esc(st.assignedStudent):'')+' · '+fmtDateShort(stStart)+' – '+fmtDateShort(stEnd);
-    return '<div class="gantt-bar" data-edit-step="'+esc(st.id)+'" style="left:'+left+'px;width:'+w+'px;background:'+stepStatusColor(st.status)+';" data-tip="'+tip+'">'+label+'</div>';
+    return '<div class="gantt-bar" data-open-entity="step:'+esc(st.id)+'" style="left:'+left+'px;width:'+w+'px;background:'+stepStatusColor(st.status)+';" data-tip="'+tip+'">'+label+'</div>';
   }
   function ganttSprintBarHtml_(sp, offsetPx, dayPx){
     var spStart = sp.startDate, spEnd = sp.endDate || sp.startDate;
@@ -3700,7 +3825,7 @@
       'data-tip="'+esc(sp.name)+': '+fmtDateShort(spStart)+' – '+fmtDateShort(spEnd)+'"></div>';
   }
   /** Solid, rounded "pill" sprint bar (colored by project) with a small handle dot at its
-   *  end — used only by the admin's combined timeline (renderAdminTimeline), which colors
+   *  end — used by the summary/team timeline (renderTimelineTree_), which colors
    *  by project instead of the dashed outline style the per-project Gantt uses. */
   function ganttMemberPillHtml_(sp, offsetPx, dayPx, color){
     var spStart = sp.startDate, spEnd = sp.endDate || sp.startDate;
@@ -3713,8 +3838,8 @@
   /** True if `text` contains `q`, case-insensitive — the shared match rule for every Gantt
    *  toolbar's search box. */
   function ganttMatch_(text, q){ return !q || String(text||'').toLowerCase().indexOf(q) > -1; }
-  /** Renders the search/status(/person)/zoom toolbar shared by renderGantt and
-   *  renderAdminTimeline. `personOptions` is an array of names to render as a person-filter
+  /** Renders the search/status(/person)/zoom toolbar shared by every scope of
+   *  renderTimelineTree_. `personOptions` is an array of names to render as a person-filter
    *  chip row — omit it (per-project view) to leave that group out entirely, since a single
    *  project has one shared set of viewers, not a "which person" axis to filter by. */
   function ganttToolbarHtml_(ui, personOptions){
@@ -3744,7 +3869,7 @@
     '</div>';
   }
   /** Wires up the toolbar rendered by ganttToolbarHtml_ above. `onChange` is the view's own
-   *  render function (renderGantt(projectId) or renderAdminTimeline) — every control just
+   *  render function (a closure re-calling renderTimelineTree_(opts) for that scope) — every control just
    *  mutates the shared `ui` state object in place and re-renders from scratch, same pattern
    *  as the rest of this app. The search input is the one control that needs special care:
    *  a full re-render on every keystroke replaces the DOM node, which would normally drop
@@ -3796,133 +3921,90 @@
     }
   }
 
-  /** Renders one project's Gantt: one dashed outline bar per sprint (spanning its own
-   *  start–end) with its steps as colored sub-rows underneath, all sharing one date axis.
-   *  Any signed-in user who can reach this view already owns the project (or is admin —
-   *  see readOwnProjectsData_ in Code.gs), so every control here is always shown; the
-   *  server enforces the real permission check again regardless. Sprints are collapsible
-   *  (state.collapsedSprints) so a sprint with many steps can be folded out of the way. */
-  function renderGantt(projectId){
-    var allSprints = sprintsForProject(projectId);
-    var wrap = document.getElementById('pd-gantt');
-    var toolbarEl = document.getElementById('pd-gantt-toolbar');
-    var ui = state.ganttUi.project;
-    if(!allSprints.length){
-      toolbarEl.innerHTML = '';
-      wrap.innerHTML = '<div class="project-empty">No sprints yet — click "+ Add Sprint" above to start the timeline.</div>';
-      return;
-    }
-    toolbarEl.innerHTML = ganttToolbarHtml_(ui, null);
-
-    var q = (ui.search || '').trim().toLowerCase();
-    var statusActive = Object.keys(ui.status).length > 0;
-
-    var dates = [todayISO()];
-    allSprints.forEach(function(sp){
-      if(sp.startDate) dates.push(sp.startDate);
-      if(sp.endDate) dates.push(sp.endDate);
-      stepsForSprint(sp.id).forEach(function(st){
-        if(st.startDate) dates.push(st.startDate);
-        if(st.endDate) dates.push(st.endDate);
-      });
+  /** Attaches click-and-hold drag panning to a Gantt-style scroll container — mirrors what
+   *  native horizontal scroll/trackpad already does, for anyone who'd rather grab and drag.
+   *  Bound once per wrap element (guarded by __dragBound) since the wrap itself persists
+   *  across re-renders; only its innerHTML is replaced each render. Sets wrap.__justDragged
+   *  for one tick after a real drag so the click that naturally follows mouseup doesn't also
+   *  toggle/open whatever was under the cursor. */
+  function bindGanttDragPan_(wrap){
+    wrap.classList.add('is-pannable');
+    var dragging = false, startX = 0, startScroll = 0;
+    wrap.addEventListener('mousedown', function(e){
+      if(e.button !== 0 || e.target.closest('button, input, select, textarea, a')) return;
+      dragging = true; startX = e.pageX; startScroll = wrap.scrollLeft;
+      wrap.classList.add('is-dragging');
     });
-    var dateRange = ganttDateRange_(dates);
-    var dayPx = resolveGanttDayPx_(dateRange, ui, wrap);
-    var granularity = resolveGanttGranularity_(ui, dayPx);
-    var scale = buildGanttScale_(dates, dayPx, granularity);
-    var offsetPx = scale.offsetPx, totalPx = scale.totalPx, todayLine = scale.todayLine;
-
-    var rowsHtml = [];
-    allSprints.forEach(function(sp){
-      var steps = stepsForSprint(sp.id);
-      var sprintNameMatches = ganttMatch_(sp.name, q);
-      var matchingSteps = steps.filter(function(st){ return ganttMatch_(st.name, q); });
-      if(q && !sprintNameMatches && !matchingSteps.length) return; // no relevance to the search at all
-
-      var collapsed = !!state.collapsedSprints[sp.id];
-      var forceExpand = !!q && !sprintNameMatches && matchingSteps.length > 0;
-      var showSteps = !collapsed || forceExpand;
-      rowsHtml.push('<div class="gantt-row is-sprint">'+
-        '<div class="gantt-label is-sprint" data-edit-sprint="'+esc(sp.id)+'"><div class="sprint-group-head">'+
-        '<button class="gantt-caret" data-toggle-sprint="'+esc(sp.id)+'" data-tip="'+(showSteps?'Collapse':'Expand')+' this sprint" aria-label="'+(showSteps?'Collapse':'Expand')+' '+esc(sp.name)+'">'+(showSteps?'▾':'▸')+'</button>'+
-        '<span class="gantt-label-name" data-tip="'+esc(sp.name)+'">'+esc(sp.name)+(!showSteps?' ('+steps.length+')':'')+'</span>'+
-        '<span class="sprint-group-actions"><button class="icon-btn" data-add-step="'+esc(sp.id)+'" data-tip="Add step to this sprint">+ step</button></span>'+
-        '</div></div>'+
-        '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttSprintBarHtml_(sp, offsetPx, dayPx)+todayLine+'</div>'+
-        '</div>');
-      if(!showSteps) return;
-      steps.filter(function(st){
-        if(statusActive && !ui.status[st.status || 'Not Started']) return false;
-        if(q && !(sprintNameMatches || ganttMatch_(st.name, q))) return false;
-        return true;
-      }).forEach(function(st){
-        rowsHtml.push('<div class="gantt-row is-step">'+
-          '<div class="gantt-label is-step" data-edit-step="'+esc(st.id)+'"><span class="gantt-label-name" data-tip="'+esc(st.name)+'">'+esc(st.name)+'</span></div>'+
-          '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttStepBarHtml_(st, offsetPx, dayPx)+todayLine+'</div>'+
-          '</div>');
-      });
+    window.addEventListener('mousemove', function(e){
+      if(!dragging) return;
+      var dx = e.pageX - startX;
+      if(Math.abs(dx) > 4) wrap.__justDragged = true;
+      wrap.scrollLeft = startScroll - dx;
     });
-
-    wrap.innerHTML = rowsHtml.length ?
-      '<div class="gantt-header"><div class="gantt-label"></div><div class="gantt-ticks" style="width:'+totalPx+'px;">'+scale.ticksHtml+todayLine+'</div></div>'+
-      '<div class="gantt-body">'+rowsHtml.join('')+'</div>'
-      : '<div class="project-empty">No sprints or steps match your search/filters.</div>';
-    bindTooltips(wrap);
-    bindGanttToolbar_(toolbarEl, ui, function(){ renderGantt(projectId); });
-    wrap.querySelectorAll('[data-toggle-sprint]').forEach(function(btn){
-      btn.addEventListener('click', function(e){
-        e.stopPropagation();
-        var id = btn.getAttribute('data-toggle-sprint');
-        if(state.collapsedSprints[id]) delete state.collapsedSprints[id]; else state.collapsedSprints[id] = true;
-        renderGantt(projectId);
-      });
-    });
-    wrap.querySelectorAll('[data-edit-sprint]').forEach(function(el){
-      el.addEventListener('click', function(e){ if(e.target.closest('[data-add-step],[data-toggle-sprint]')) return; openSprintModal(el.getAttribute('data-edit-sprint')); });
-    });
-    wrap.querySelectorAll('[data-add-step]').forEach(function(btn){
-      btn.addEventListener('click', function(e){ e.stopPropagation(); openStepModal(null, btn.getAttribute('data-add-step')); });
-    });
-    wrap.querySelectorAll('[data-edit-step]').forEach(function(el){
-      el.addEventListener('click', function(){ openStepModal(el.getAttribute('data-edit-step')); });
+    window.addEventListener('mouseup', function(){
+      if(!dragging) return;
+      dragging = false;
+      wrap.classList.remove('is-dragging');
+      setTimeout(function(){ wrap.__justDragged = false; }, 0);
     });
   }
+  /** Solid colored bar spanning a plain {start,end} range (a whole project's span, derived
+   *  from its sprints — see projectDateRange) — same visual language as ganttMemberPillHtml_
+   *  but for a range object rather than a sprint record. */
+  function ganttProjectBarHtml_(range, offsetPx, dayPx, color, name){
+    if(!range) return '';
+    var left = offsetPx(range.start), w = Math.max(6, dayPx, (daysBetweenIso(range.start,range.end)+1)*dayPx);
+    var label = w > 56 ? '<span class="gantt-bar-label">'+esc(name)+'</span>' : '';
+    return '<div class="gantt-bar is-pill is-project-bar" style="left:'+left+'px;width:'+w+'px;background:'+color+';" '+
+      'data-tip="'+esc(name)+': '+fmtDateShort(range.start)+' – '+fmtDateShort(range.end)+'">'+label+'</div>';
+  }
+  /** One engine behind every timeline tree in the app — a single project's own Timeline
+   *  (scope:'single'), a member's own Summary timeline across all their projects
+   *  (scope:'mine'), and admin's Team timeline across everyone (scope:'team', adding an
+   *  Employee level above Project). All three share one fold state (state.tl), one toolbar
+   *  (search/status/person/zoom — see ganttToolbarHtml_), one drag-to-pan behavior, and one
+   *  click rule: clicking anywhere on an owner/project/sprint row (caret, dot, or name)
+   *  expands or collapses it; clicking a step opens its read-only info card (openEntityInfo_)
+   *  since a step has nothing further to drill into. */
+  function renderTimelineTree_(opts){
+    var wrap = document.getElementById(opts.wrapId);
+    var toolbarEl = document.getElementById(opts.toolbarId);
+    var legendWrap = opts.legendId ? document.getElementById(opts.legendId) : null;
+    var ui = state.ganttUi[opts.scope === 'single' ? 'project' : 'summary'];
 
-  /** Admin-only combined timeline across every member's projects, grouped by team member
-   *  (one row group per person, avatar + name) with each of their sprints as a solid
-   *  colored pill bar underneath, colored by project. Clicking a sprint expands it in
-   *  place to show its steps right there (state.expandedAdminSprints) — this is purely a
-   *  read view, though: a sprint/step's save handler stamps its project from
-   *  state.detailProject (see openSprintModal/openStepModal below), which is only correct
-   *  once you've actually navigated into that project's own detail page, so editing always
-   *  goes through the small "↗" open button rather than an edit modal directly from here. */
-  function renderAdminTimeline(){
-    var wrap = document.getElementById('admin-timeline-gantt');
-    var toolbarEl = document.getElementById('admin-timeline-toolbar');
-    var legendWrap = document.getElementById('admin-timeline-project-legend');
-    var ui = state.ganttUi.admin;
-    if(!state.projects.length){
+    var rootProjects = opts.scope === 'single' ? [projectById(opts.projectId)].filter(Boolean) : state.projects;
+    var byOwner = null, ownerOrder = null;
+    if(opts.scope === 'team'){
+      byOwner = {}; ownerOrder = [];
+      rootProjects.forEach(function(p){
+        var owner = p.ownerName || 'Unassigned';
+        if(!byOwner[owner]){ byOwner[owner] = []; ownerOrder.push(owner); }
+        byOwner[owner].push(p);
+      });
+      ownerOrder.sort(function(a,b){ return a.localeCompare(b); });
+    }
+
+    var relevantSprints = opts.scope === 'single' ? sprintsForProject(opts.projectId) :
+      state.sprints.filter(function(sp){ return rootProjects.some(function(p){ return p.id === sp.projectId; }); });
+    var hasContent = opts.scope === 'single' ? relevantSprints.length > 0 : rootProjects.length > 0;
+    if(!hasContent){
       toolbarEl.innerHTML = '';
-      wrap.innerHTML = '<div class="project-empty">No projects yet across the team.</div>';
+      wrap.innerHTML = '<div class="project-empty">'+(opts.scope==='single' ? 'No sprints yet — click "+ Add Sprint" above to start the timeline.' : 'No projects yet.')+'</div>';
       if(legendWrap) legendWrap.innerHTML = '';
       return;
     }
-    var byOwner = {}, ownerOrder = [];
-    state.projects.forEach(function(p){
-      var owner = p.ownerName || 'Unassigned';
-      if(!byOwner[owner]){ byOwner[owner] = []; ownerOrder.push(owner); }
-      byOwner[owner].push(p);
-    });
-    ownerOrder.sort(function(a,b){ return a.localeCompare(b); });
-    toolbarEl.innerHTML = ganttToolbarHtml_(ui, ownerOrder);
 
+    toolbarEl.innerHTML = ganttToolbarHtml_(ui, opts.scope === 'team' ? ownerOrder : null);
     var q = (ui.search || '').trim().toLowerCase();
     var statusActive = Object.keys(ui.status).length > 0;
-    var personActive = Object.keys(ui.person).length > 0;
+    var personActive = opts.scope === 'team' && Object.keys(ui.person).length > 0;
 
     var dates = [todayISO()];
-    state.sprints.forEach(function(sp){ if(sp.startDate) dates.push(sp.startDate); if(sp.endDate) dates.push(sp.endDate); });
-    state.steps.forEach(function(st){ if(st.startDate) dates.push(st.startDate); if(st.endDate) dates.push(st.endDate); });
+    relevantSprints.forEach(function(sp){
+      if(sp.startDate) dates.push(sp.startDate);
+      if(sp.endDate) dates.push(sp.endDate);
+      stepsForSprint(sp.id).forEach(function(st){ if(st.startDate) dates.push(st.startDate); if(st.endDate) dates.push(st.endDate); });
+    });
     var dateRange = ganttDateRange_(dates);
     var dayPx = resolveGanttDayPx_(dateRange, ui, wrap);
     var granularity = resolveGanttGranularity_(ui, dayPx);
@@ -3930,89 +4012,116 @@
     var offsetPx = scale.offsetPx, totalPx = scale.totalPx, todayLine = scale.todayLine;
 
     var rowsHtml = [];
-    ownerOrder.forEach(function(owner){
-      if(personActive && !ui.person[owner]) return;
-      var projects = byOwner[owner];
-      var ownerMatches = ganttMatch_(owner, q);
 
-      // Figure out, before rendering, whether this member has anything relevant to the
-      // current search so an irrelevant member can be skipped entirely rather than shown
-      // with an empty "no sprints" row.
-      var relevantSprintCount = 0;
-      projects.forEach(function(p){
-        var projectMatches = ganttMatch_(p.name, q);
-        sprintsForProject(p.id).forEach(function(sp){
-          var sprintMatches = ganttMatch_(sp.name, q);
-          var stepMatches = stepsForSprint(sp.id).some(function(st){ return ganttMatch_(st.name, q); });
-          if(!q || ownerMatches || projectMatches || sprintMatches || stepMatches) relevantSprintCount++;
-        });
-      });
-      if(q && !ownerMatches && !relevantSprintCount) return;
+    function pushSprint(sp, level, ownerMatches, projectMatches){
+      var steps = stepsForSprint(sp.id);
+      var sprintMatches = ganttMatch_(sp.name, q);
+      var matchingSteps = steps.filter(function(st){ return ganttMatch_(st.name, q); });
+      if(q && !ownerMatches && !projectMatches && !sprintMatches && !matchingSteps.length) return;
 
-      var mCollapsed = !!state.collapsedAdminMembers[owner];
-      var sprintTotal = 0;
-      projects.forEach(function(p){ sprintTotal += sprintsForProject(p.id).length; });
-      rowsHtml.push('<div class="gantt-row is-member">'+
-        '<div class="gantt-label is-member" data-toggle-member="'+esc(owner)+'"><div class="sprint-group-head">'+
-        '<span class="gantt-caret" aria-hidden="true">'+(mCollapsed?'▸':'▾')+'</span>'+
-        '<span class="avatar-sm" style="background:'+studentColor(owner)+'">'+initials(owner)+'</span>'+
-        '<span class="gantt-label-name" data-tip="'+esc(owner)+'">'+esc(owner)+(mCollapsed?' ('+sprintTotal+' sprint'+(sprintTotal===1?'':'s')+')':'')+'</span>'+
+      var expanded = !!state.tl.expandedSprint[sp.id];
+      var forceExpand = !!q && !ownerMatches && !projectMatches && !sprintMatches && matchingSteps.length > 0;
+      var showSteps = expanded || forceExpand;
+      var indent = 10 + level*16, stepIndent = 10 + (level+1)*16;
+      rowsHtml.push('<div class="gantt-row is-sprint is-clickable" data-toggle-sprint="'+esc(sp.id)+'">'+
+        '<div class="gantt-label is-sprint" style="padding-left:'+indent+'px;"><div class="sprint-group-head">'+
+        '<span class="gantt-caret" aria-hidden="true" data-tip="'+(showSteps?'Hide':'Show')+' this sprint\'s steps">'+(showSteps?'▾':'▸')+'</span>'+
+        (level>0 ? '<span class="project-dot" style="background:'+projectColor(sp.projectId)+'"></span>' : '')+
+        '<span class="gantt-label-name" data-tip="'+esc(sp.name)+'">'+esc(sp.name)+(steps.length?' ('+steps.length+')':'')+'</span>'+
+        '<span class="sprint-group-actions">'+
+        (opts.scope==='single' ? '<button class="icon-btn" data-add-step="'+esc(sp.id)+'" data-tip="Add step to this sprint">+ step</button>' : '')+
+        '<button class="icon-btn" data-edit-sprint="'+esc(sp.id)+'" data-tip="Edit this sprint">✎</button>'+
+        '</span>'+
         '</div></div>'+
-        '<div class="gantt-track" style="width:'+totalPx+'px;">'+todayLine+'</div>'+
+        '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttMemberPillHtml_(sp, offsetPx, dayPx, projectColor(sp.projectId))+todayLine+'</div>'+
         '</div>');
-      if(mCollapsed) return;
-
-      var anySprint = false;
-      var showProjectTag = projects.length > 1;
-      projects.forEach(function(p){
-        var projectMatches = ganttMatch_(p.name, q);
-        sprintsForProject(p.id).forEach(function(sp){
-          var sprintMatches = ganttMatch_(sp.name, q);
-          var steps = stepsForSprint(sp.id);
-          var matchingSteps = steps.filter(function(st){ return ganttMatch_(st.name, q); });
-          var relevant = !q || ownerMatches || projectMatches || sprintMatches || matchingSteps.length > 0;
-          if(!relevant) return;
-          anySprint = true;
-
-          var expanded = !!state.expandedAdminSprints[sp.id];
-          var forceExpand = !!q && !ownerMatches && !projectMatches && !sprintMatches && matchingSteps.length > 0;
-          var showSteps = expanded || forceExpand;
-          rowsHtml.push('<div class="gantt-row is-sprint is-clickable" data-toggle-admin-sprint="'+esc(sp.id)+'">'+
-            '<div class="gantt-label is-sprint is-nested"><div class="sprint-group-head">'+
-            '<span class="gantt-caret" aria-hidden="true" data-tip="'+(showSteps?'Hide':'Show')+' this sprint\'s steps">'+(showSteps?'▾':'▸')+'</span>'+
-            '<span class="project-dot" style="background:'+projectColor(p.id)+'"></span>'+
-            '<span class="gantt-label-name" data-tip="'+esc(sp.name)+(showProjectTag?' · '+esc(p.name):'')+'">'+esc(sp.name)+(steps.length ? ' ('+steps.length+')' : '')+'</span>'+
-            (showProjectTag ? '<span class="project-owner-tag">'+esc(p.name)+'</span>' : '')+
-            '</div></div>'+
-            '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttMemberPillHtml_(sp, offsetPx, dayPx, projectColor(p.id))+todayLine+'</div>'+
-            '<button class="icon-btn gantt-open-btn" data-open-project="'+esc(p.id)+'" data-tip="Open '+esc(p.name)+' to edit">Open ↗</button>'+
-            '</div>');
-          if(!showSteps) return;
-          var visibleSteps = steps.filter(function(st){
-            if(statusActive && !ui.status[st.status || 'Not Started']) return false;
-            if(q && !(ownerMatches || projectMatches || sprintMatches || ganttMatch_(st.name, q))) return false;
-            return true;
-          });
-          if(!visibleSteps.length){
-            rowsHtml.push('<div class="gantt-row is-step"><div class="gantt-label is-step is-nested">'+
-              '<span class="gantt-label-name" style="font-style:italic;color:var(--text-muted);">'+(steps.length?'No steps match':'No steps yet')+'</span></div>'+
-              '<div class="gantt-track" style="width:'+totalPx+'px;">'+todayLine+'</div></div>');
-            return;
-          }
-          visibleSteps.forEach(function(st){
-            rowsHtml.push('<div class="gantt-row is-step">'+
-              '<div class="gantt-label is-step is-nested" data-open-project="'+esc(p.id)+'"><span class="gantt-label-name" data-tip="Open '+esc(p.name)+'">'+esc(st.name)+'</span></div>'+
-              '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttStepBarHtml_(st, offsetPx, dayPx)+todayLine+'</div>'+
-              '</div>');
-          });
-        });
+      if(!showSteps) return;
+      var visibleSteps = steps.filter(function(st){
+        if(statusActive && !ui.status[st.status || 'Not Started']) return false;
+        if(q && !(ownerMatches || projectMatches || sprintMatches || ganttMatch_(st.name, q))) return false;
+        return true;
       });
-      if(!anySprint){
-        rowsHtml.push('<div class="gantt-row is-sprint"><div class="gantt-label is-sprint is-nested">'+
+      if(!visibleSteps.length){
+        rowsHtml.push('<div class="gantt-row is-step"><div class="gantt-label is-step" style="padding-left:'+stepIndent+'px;">'+
+          '<span class="gantt-label-name" style="font-style:italic;color:var(--text-muted);">'+(steps.length?'No steps match':'No steps yet')+'</span></div>'+
+          '<div class="gantt-track" style="width:'+totalPx+'px;">'+todayLine+'</div></div>');
+        return;
+      }
+      visibleSteps.forEach(function(st){
+        rowsHtml.push('<div class="gantt-row is-step">'+
+          '<div class="gantt-label is-step" style="padding-left:'+stepIndent+'px;" data-open-entity="step:'+esc(st.id)+'"><span class="gantt-label-name" data-tip="'+esc(st.name)+'">'+esc(st.name)+'</span></div>'+
+          '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttStepBarHtml_(st, offsetPx, dayPx)+todayLine+'</div>'+
+          '</div>');
+      });
+    }
+
+    function pushProject(p, level, ownerMatches){
+      var sprints = sprintsForProject(p.id);
+      var projectMatches = ganttMatch_(p.name, q);
+      var relevantHere = sprints.filter(function(sp){
+        var sprintMatches = ganttMatch_(sp.name, q);
+        var stepMatches = stepsForSprint(sp.id).some(function(st){ return ganttMatch_(st.name, q); });
+        return !q || ownerMatches || projectMatches || sprintMatches || stepMatches;
+      });
+      if(q && !ownerMatches && !projectMatches && !relevantHere.length) return;
+
+      var expanded = !!state.tl.expandedProject[p.id];
+      var showChildren = q ? (expanded || relevantHere.length > 0) : expanded;
+      var range = projectDateRange(p);
+      var color = projectColor(p.id);
+      var indent = 10 + level*16;
+      rowsHtml.push('<div class="gantt-row is-sprint is-clickable" data-toggle-project="'+esc(p.id)+'">'+
+        '<div class="gantt-label is-project" style="padding-left:'+indent+'px;"><div class="sprint-group-head">'+
+        '<span class="gantt-caret" aria-hidden="true">'+(showChildren?'▾':'▸')+'</span>'+
+        '<span class="project-dot" style="background:'+color+'"></span>'+
+        '<span class="gantt-label-name" data-tip="'+esc(p.name)+'">'+esc(p.name)+(sprints.length?' ('+sprints.length+')':'')+'</span>'+
+        (opts.scope!=='single' ? '<span class="sprint-group-actions"><button class="icon-btn" data-open-project="'+esc(p.id)+'" data-tip="Open this project">↗</button></span>' : '')+
+        '</div></div>'+
+        '<div class="gantt-track" style="width:'+totalPx+'px;">'+(range?ganttProjectBarHtml_(range, offsetPx, dayPx, color, p.name):'')+todayLine+'</div>'+
+        '</div>');
+      if(!showChildren) return;
+      if(!sprints.length){
+        rowsHtml.push('<div class="gantt-row is-step"><div class="gantt-label is-step" style="padding-left:'+(indent+16)+'px;">'+
           '<span class="gantt-label-name" style="font-style:italic;color:var(--text-muted);">No sprints yet</span></div>'+
           '<div class="gantt-track" style="width:'+totalPx+'px;">'+todayLine+'</div></div>');
+        return;
       }
-    });
+      relevantHere.forEach(function(sp){ pushSprint(sp, level+1, ownerMatches, projectMatches); });
+    }
+
+    if(opts.scope === 'team'){
+      ownerOrder.forEach(function(owner){
+        if(personActive && !ui.person[owner]) return;
+        var ownerMatches = ganttMatch_(owner, q);
+        var projects = byOwner[owner];
+        var anyRelevant = !q || ownerMatches || projects.some(function(p){
+          return ganttMatch_(p.name, q) || sprintsForProject(p.id).some(function(sp){
+            return ganttMatch_(sp.name, q) || stepsForSprint(sp.id).some(function(st){ return ganttMatch_(st.name, q); });
+          });
+        });
+        if(q && !anyRelevant) return;
+
+        var expanded = !!state.tl.expandedOwner[owner];
+        var showChildren = q ? (expanded || anyRelevant) : expanded;
+        var sprintTotal = 0;
+        projects.forEach(function(p){ sprintTotal += sprintsForProject(p.id).length; });
+        rowsHtml.push('<div class="gantt-row is-owner is-clickable" data-toggle-owner="'+esc(owner)+'">'+
+          '<div class="gantt-label is-owner"><div class="sprint-group-head">'+
+          '<span class="gantt-caret" aria-hidden="true">'+(showChildren?'▾':'▸')+'</span>'+
+          '<span class="avatar-sm" style="background:'+studentColor(owner)+'">'+initials(owner)+'</span>'+
+          '<span class="gantt-label-name" data-tip="'+esc(owner)+'">'+esc(owner)+(sprintTotal?' ('+sprintTotal+' sprint'+(sprintTotal===1?'':'s')+')':'')+'</span>'+
+          '</div></div>'+
+          '<div class="gantt-track" style="width:'+totalPx+'px;">'+todayLine+'</div>'+
+          '</div>');
+        if(!showChildren) return;
+        if(!projects.length) return;
+        projects.forEach(function(p){ pushProject(p, 1, ownerMatches); });
+      });
+    } else if(opts.scope === 'mine'){
+      rootProjects.forEach(function(p){ pushProject(p, 0, false); });
+    } else {
+      relevantSprints.forEach(function(sp){ pushSprint(sp, 0, false, false); });
+    }
 
     wrap.innerHTML = rowsHtml.length ?
       '<div class="gantt-header"><div class="gantt-label"></div><div class="gantt-ticks" style="width:'+totalPx+'px;">'+scale.ticksHtml+todayLine+'</div></div>'+
@@ -4021,31 +4130,115 @@
     bindTooltips(wrap);
 
     if(legendWrap){
-      legendWrap.innerHTML = state.projects.map(function(p){
+      legendWrap.innerHTML = rootProjects.map(function(p){
         return '<span><i class="dot" style="background:'+projectColor(p.id)+'"></i>'+esc(p.name)+'</span>';
       }).join('');
     }
 
-    bindGanttToolbar_(toolbarEl, ui, renderAdminTimeline);
-    wrap.querySelectorAll('[data-toggle-member]').forEach(function(el){
-      el.addEventListener('click', function(){
-        var owner = el.getAttribute('data-toggle-member');
-        if(state.collapsedAdminMembers[owner]) delete state.collapsedAdminMembers[owner]; else state.collapsedAdminMembers[owner] = true;
-        renderAdminTimeline();
+    bindGanttToolbar_(toolbarEl, ui, function(){ renderTimelineTree_(opts); });
+    if(!wrap.__dragBound){ wrap.__dragBound = true; bindGanttDragPan_(wrap); }
+
+    wrap.querySelectorAll('[data-toggle-owner]').forEach(function(row){
+      row.addEventListener('click', function(){
+        if(wrap.__justDragged) return;
+        var owner = row.getAttribute('data-toggle-owner');
+        if(state.tl.expandedOwner[owner]) delete state.tl.expandedOwner[owner]; else state.tl.expandedOwner[owner] = true;
+        renderTimelineTree_(opts);
       });
     });
-    wrap.querySelectorAll('[data-toggle-admin-sprint]').forEach(function(row){
+    wrap.querySelectorAll('[data-toggle-project]').forEach(function(row){
       row.addEventListener('click', function(e){
+        if(wrap.__justDragged) return;
         if(e.target.closest('[data-open-project]')) return;
-        var id = row.getAttribute('data-toggle-admin-sprint');
-        if(state.expandedAdminSprints[id]) delete state.expandedAdminSprints[id]; else state.expandedAdminSprints[id] = true;
-        renderAdminTimeline();
+        var id = row.getAttribute('data-toggle-project');
+        if(state.tl.expandedProject[id]) delete state.tl.expandedProject[id]; else state.tl.expandedProject[id] = true;
+        renderTimelineTree_(opts);
       });
     });
-    wrap.querySelectorAll('[data-open-project]').forEach(function(el){
-      el.addEventListener('click', function(e){ e.stopPropagation(); openProjectDetail(el.getAttribute('data-open-project')); });
+    wrap.querySelectorAll('[data-open-project]').forEach(function(btn){
+      btn.addEventListener('click', function(e){ e.stopPropagation(); openProjectDetail(btn.getAttribute('data-open-project')); });
+    });
+    wrap.querySelectorAll('[data-toggle-sprint]').forEach(function(row){
+      row.addEventListener('click', function(e){
+        if(wrap.__justDragged) return;
+        if(e.target.closest('[data-add-step], [data-edit-sprint]')) return;
+        var id = row.getAttribute('data-toggle-sprint');
+        if(state.tl.expandedSprint[id]) delete state.tl.expandedSprint[id]; else state.tl.expandedSprint[id] = true;
+        renderTimelineTree_(opts);
+      });
+    });
+    wrap.querySelectorAll('[data-add-step]').forEach(function(btn){
+      btn.addEventListener('click', function(e){ e.stopPropagation(); openStepModal(null, btn.getAttribute('data-add-step')); });
+    });
+    wrap.querySelectorAll('[data-edit-sprint]').forEach(function(btn){
+      btn.addEventListener('click', function(e){ e.stopPropagation(); openSprintModal(btn.getAttribute('data-edit-sprint')); });
+    });
+    wrap.querySelectorAll('[data-open-entity]').forEach(function(el){
+      el.addEventListener('click', function(e){
+        if(wrap.__justDragged) return;
+        e.stopPropagation();
+        var parts = el.getAttribute('data-open-entity').split(':');
+        openEntityInfo_(parts[0], parts.slice(1).join(':'));
+      });
     });
   }
+
+  /** Read-only info card for a project/sprint/step (or, for admin, a team member row),
+   *  opened from any timeline bar/label or calendar bar. Its Edit button hands off to the
+   *  real, already-battle-tested edit modal for that type rather than duplicating any save
+   *  logic here. `id` for kind 'owner' is the owner's display name, not a record id. */
+  var entityInfoOverlay = document.getElementById('entity-info-overlay');
+  function openEntityInfo_(kind, id){
+    var body = document.getElementById('entity-info-body');
+    var editBtn = document.getElementById('entity-info-edit-btn');
+    var html = '';
+    if(kind === 'project'){
+      var p = projectById(id); if(!p) return;
+      var range = projectDateRange(p), pct = projectProgressPct_(p);
+      html = '<div class="info-kind">Project</div><div class="info-title">'+esc(p.name)+'</div>'+
+        (p.ownerName ? '<div class="info-row"><span class="k">Owner</span><span class="v">'+esc(p.ownerName)+'</span></div>' : '')+
+        (range ? '<div class="info-row"><span class="k">Span</span><span class="v">'+fmtDateShort(range.start)+' – '+fmtDateShort(range.end)+'</span></div>' : '')+
+        '<div class="info-row"><span class="k">Progress</span><span class="v">'+pct+'% done</span></div>'+
+        (p.description ? '<div class="info-row"><span class="k">Description</span><span class="v info-desc">'+esc(p.description)+'</span></div>' : '');
+      editBtn.style.display = '';
+      editBtn.onclick = function(){ closeEntityInfo_(); openProjectModal(id); };
+    } else if(kind === 'sprint'){
+      var sp = sprintById(id); if(!sp) return;
+      var steps = stepsForSprint(id);
+      html = '<div class="info-kind">Sprint</div><div class="info-title">'+esc(sp.name)+'</div>'+
+        '<div class="info-row"><span class="k">Project</span><span class="v">'+esc(projectName(sp.projectId))+'</span></div>'+
+        '<div class="info-row"><span class="k">Dates</span><span class="v">'+fmtDateShort(sp.startDate)+' – '+fmtDateShort(sp.endDate)+'</span></div>'+
+        '<div class="info-row"><span class="k">Steps</span><span class="v">'+steps.length+'</span></div>'+
+        (sp.description ? '<div class="info-row"><span class="k">Description</span><span class="v info-desc">'+esc(sp.description)+'</span></div>' : '');
+      editBtn.style.display = '';
+      editBtn.onclick = function(){ closeEntityInfo_(); openSprintModal(id); };
+    } else if(kind === 'step'){
+      var st = state.steps.find(function(x){ return x.id===id; }); if(!st) return;
+      var color = stepStatusColor(st.status);
+      html = '<div class="info-kind">Step</div><div class="info-title">'+esc(st.name)+'</div>'+
+        '<div class="info-row"><span class="k">Sprint</span><span class="v">'+esc((sprintById(st.sprintId)||{}).name||'')+'</span></div>'+
+        '<div class="info-row"><span class="k">Dates</span><span class="v">'+fmtDateShort(st.startDate)+' – '+fmtDateShort(st.endDate)+'</span></div>'+
+        (st.assignedStudent ? '<div class="info-row"><span class="k">Assigned to</span><span class="v">'+esc(st.assignedStudent)+'</span></div>' : '')+
+        '<div class="info-row"><span class="k">Status</span><span class="v"><span class="status-pill" style="background:color-mix(in srgb, '+color+' 16%, transparent);color:'+color+';"><i style="background:'+color+'"></i>'+esc(st.status||'Not Started')+'</span></span></div>'+
+        (st.description ? '<div class="info-row"><span class="k">Description</span><span class="v info-desc">'+esc(st.description)+'</span></div>' : '')+
+        (st.notes ? '<div class="info-row"><span class="k">Notes</span><span class="v info-desc">'+esc(st.notes)+'</span></div>' : '');
+      editBtn.style.display = '';
+      editBtn.onclick = function(){ closeEntityInfo_(); openStepModal(id); };
+    } else if(kind === 'owner'){
+      var projects = state.projects.filter(function(pr){ return (pr.ownerName||'Unassigned')===id; });
+      html = '<div class="info-kind">Team member</div><div class="info-title">'+esc(id)+'</div>'+
+        '<div class="info-row"><span class="k">Projects</span><span class="v">'+projects.length+'</span></div>';
+      editBtn.style.display = 'none';
+    } else {
+      return;
+    }
+    body.innerHTML = html;
+    entityInfoOverlay.classList.add('show');
+  }
+  function closeEntityInfo_(){ entityInfoOverlay.classList.remove('show'); }
+  document.getElementById('entity-info-close').addEventListener('click', closeEntityInfo_);
+  document.getElementById('entity-info-close-btn').addEventListener('click', closeEntityInfo_);
+  entityInfoOverlay.addEventListener('click', function(e){ if(e.target===entityInfoOverlay) closeEntityInfo_(); });
 
   /* ---------- Project modal (add/edit) ---------- */
   var projectOverlay = document.getElementById('project-overlay');
@@ -4201,9 +4394,15 @@
     if(!name){ showToast('Sprint name is required.'); return; }
     var startDate = document.getElementById('sf-startDate').value, endDate = document.getElementById('sf-endDate').value;
     if(startDate && endDate && endDate < startDate){ showToast('Sprint end date is before its start date.'); return; }
-    var data = { projectId: state.detailProject, name: name, description: document.getElementById('sf-description').value,
-      startDate: startDate, endDate: endDate, notes: document.getElementById('sf-notes').value };
     var isEdit = !!state.editingSprintId;
+    // projectId is only set when adding — editing must never overwrite it from
+    // state.detailProject, which is only guaranteed correct when the modal was opened via
+    // "+ Add Sprint" on that project's own detail page. Since edits can now also be opened
+    // from the Summary/Team timeline (a different project's page may have been visited most
+    // recently, or none at all), stamping it here would silently reparent the sprint.
+    var data = { name: name, description: document.getElementById('sf-description').value,
+      startDate: startDate, endDate: endDate, notes: document.getElementById('sf-notes').value };
+    if(!isEdit) data.projectId = state.detailProject;
     if(SAMPLE){
       var now = new Date().toISOString();
       if(isEdit){ Object.assign(sprintById(state.editingSprintId), data, {updatedAt: now}); }
@@ -4321,10 +4520,14 @@
     if(startDate && endDate && endDate < startDate){ showToast('Step end date is before its start date.'); return; }
     var isEdit = !!state.editingStepId;
     var sprintId = isEdit ? state.steps.find(function(x){return x.id===state.editingStepId;}).sprintId : state.stepSprintContext;
-    var data = { projectId: state.detailProject, sprintId: sprintId, name: name,
+    // See the matching comment in the sprint save handler above — projectId must not be
+    // stamped from state.detailProject on an edit, since the edit modal can now be reached
+    // from the Summary/Team timeline and the calendar, not only from the project's own page.
+    var data = { sprintId: sprintId, name: name,
       description: document.getElementById('stf-description').value, startDate: startDate, endDate: endDate,
       status: document.getElementById('stf-status').value, assignedStudent: document.getElementById('stf-assignedStudent').value.trim(),
       notes: document.getElementById('stf-notes').value };
+    if(!isEdit) data.projectId = state.detailProject;
     if(SAMPLE){
       var now = new Date().toISOString();
       if(isEdit){ Object.assign(state.steps.find(function(x){return x.id===state.editingStepId;}), data, {updatedAt: now}); }
