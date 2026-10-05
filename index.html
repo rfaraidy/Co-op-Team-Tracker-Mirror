@@ -4156,7 +4156,7 @@
   }
 
   /* ---------- Admin "sequence" timeline (reference wave-plan look) ----------
-     Used instead of the Gantt engine whenever the viewer is admin — the Projects tab's Team
+     Used instead of the Gantt engine for every role — the Projects tab's Team
      timeline (owner → project), a person-scoped page (project rows) and a project's own page
      (sprint rows). Every row is a chevron `.rowbtn` with a mono sub-line and one coloured bar
      snapped to half-month columns; opening it reveals a `.det` panel with an outcome callout and a
@@ -4296,7 +4296,7 @@
         inner += '<ul class="steps">'+lis+'</ul>';
       }
       return row({ level: level, map:'p', key:p.id, open: !!state.tl.expandedProject[p.id], hlAnc: hl.projectId===p.id,
-        title: p.name, sub: (scope==='team' ? '' : (p.ownerName ? p.ownerName+' · ' : ''))+sprints.length+' sprint'+(sprints.length===1?'':'s')+(range ? ' · ends '+seqDate_(range.end) : ''),
+        title: p.name, sub: (scope==='team' || !isAdmin() ? '' : (p.ownerName ? p.ownerName+' · ' : ''))+sprints.length+' sprint'+(sprints.length===1?'':'s')+(range ? ' · ends '+seqDate_(range.end) : ''),
         span: range && spanOf(range.start, range.end), color: projectColor(p.id),
         barLabel: st.total && st.done===st.total ? '✓ Delivered' : st.done+' / '+st.total+' steps done', inner: inner });
     }
@@ -4398,7 +4398,8 @@
    *  expands or collapses it; clicking a step opens its read-only info card (openEntityInfo_)
    *  since a step has nothing further to drill into. */
   function renderTimelineTree_(opts){
-    if(isAdmin()) return renderSequenceTimeline_(opts);
+    return renderSequenceTimeline_(opts);
+    /* Legacy Gantt engine below is no longer reached — every role now gets the sequence look. */
     var wrap = document.getElementById(opts.wrapId);
     var toolbarEl = document.getElementById(opts.toolbarId);
     var legendWrap = opts.legendId ? document.getElementById(opts.legendId) : null;
