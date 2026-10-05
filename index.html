@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Competitons and Direct Commissions Team</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
   /* ---------- STC brand palette (#4f008c deep purple · #a54ee1 violet ·
      #ff375e rose · #ffffff white) applied as: deep purple = primary action
@@ -493,33 +496,57 @@
   @media (max-width:760px){ .pd-stats-bar{gap:10px 18px;} }
 
   /* Gantt timeline (project detail) */
-  .gantt-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-1);}
-  .gantt-row{display:flex;border-bottom:1px solid var(--gridline);}
+  /* ---------- timeline (Gantt) — clean, roomy "wave plan" look: IBM Plex type, chevron rows
+     with a mono sub-line, soft-shadowed bars, one thin TODAY rule. Sizes step down by level
+     (project > sprint > step) so the hierarchy reads at a glance. */
+  .gantt-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-1);
+    font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--gl:270px;}
+  .gantt-row{display:flex;border-bottom:1px solid var(--gridline);transition:opacity .2s ease;}
   .gantt-row:last-child{border-bottom:none;}
-  .gantt-label{width:220px;flex-shrink:0;padding:8px 10px;font-size:12.5px;position:sticky;left:0;
-    background:var(--surface-1);border-right:1px solid var(--border);display:flex;align-items:center;gap:6px;z-index:1;}
-  .gantt-label.is-sprint{font-weight:700;color:var(--text-primary);background:var(--page);}
-  .gantt-label.is-step{color:var(--text-secondary);padding-left:22px;}
-  .gantt-label.is-project{font-weight:700;color:var(--text-primary);background:var(--surface-1);cursor:pointer;}
-  .gantt-label.is-project:hover{background:var(--page);}
+  .gantt-label{width:var(--gl);flex-shrink:0;padding:13px 14px 13px 12px;font-size:14px;position:sticky;left:0;
+    background:var(--surface-1);border-right:1px solid var(--gridline);display:flex;align-items:center;gap:10px;z-index:3;}
+  .gantt-label.is-project{font-weight:600;color:var(--text-primary);cursor:pointer;}
+  .gantt-label.is-owner{font-weight:600;color:var(--text-primary);cursor:pointer;}
+  .gantt-label.is-sprint{font-weight:600;color:var(--text-primary);padding-top:11px;padding-bottom:11px;}
+  .gantt-label.is-step{color:var(--text-secondary);padding-top:9px;padding-bottom:9px;font-size:13.5px;cursor:pointer;
+    background:color-mix(in srgb, var(--series-1) 4%, var(--surface-1));}
+  .gantt-label.is-step:hover{color:var(--text-primary);}
   .gantt-label-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .gantt-track{position:relative;flex:1;min-height:34px;}
-  .gantt-row.is-sprint .gantt-track{background:var(--page);}
-  .gantt-bar{position:absolute;top:7px;height:20px;border-radius:4px;cursor:pointer;
-    display:flex;align-items:center;overflow:hidden;transition:filter .1s;}
+  .gl-main{display:flex;align-items:flex-start;gap:10px;min-width:0;flex:1;}
+  .gl-text{min-width:0;display:flex;flex-direction:column;}
+  .gl-title{font-size:15px;font-weight:600;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .gantt-label.is-step .gl-title{font-size:13.5px;font-weight:500;}
+  .gantt-label.is-sprint .gl-title{font-size:14px;}
+  .gl-sub{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:9px;letter-spacing:.07em;color:var(--text-muted);
+    margin-top:3px;font-weight:400;white-space:nowrap;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;}
+  .gl-chev{flex:none;width:15px;height:15px;margin-top:2px;color:var(--text-muted);transition:transform .18s ease;}
+  .gl-chev.is-open{transform:rotate(90deg);color:var(--series-1);}
+  .gl-chev-spacer{flex:none;width:15px;}
+  .gl-dot{width:10px;height:10px;border-radius:50%;flex:none;margin-top:5px;}
+  .gantt-track{position:relative;flex:1;min-height:48px;}
+  .gantt-row.is-step .gantt-track{min-height:40px;background:color-mix(in srgb, var(--series-1) 4%, var(--surface-1));}
+  .gantt-row.is-sprint .gantt-track{min-height:46px;}
+  .gantt-bar{position:absolute;top:50%;transform:translateY(-50%);height:26px;border-radius:4px;cursor:pointer;
+    display:flex;align-items:center;overflow:hidden;transition:filter .15s ease;
+    box-shadow:0 1px 2px rgba(25,21,32,.07),0 8px 24px -12px rgba(25,21,32,.28);}
   .gantt-bar:hover{filter:brightness(1.08);}
-  .gantt-bar-label{font-size:11px;font-weight:600;color:#fff;padding:0 8px;white-space:nowrap;
+  .gantt-bar-label{font-size:11px;font-weight:600;color:#fff;padding:0 12px;white-space:nowrap;letter-spacing:.01em;
     overflow:hidden;text-overflow:ellipsis;}
-  .gantt-bar.is-sprint-bar{background:transparent;border:1.5px dashed var(--text-muted);height:10px;top:12px;}
-  .gantt-bar.is-pill{border-radius:999px;}
-  .gantt-bar-handle{position:absolute;right:3px;top:50%;transform:translateY(-50%);width:13px;height:13px;
-    border-radius:50%;background:rgba(255,255,255,.55);}
+  .gantt-bar.is-pill{height:22px;border-radius:4px;opacity:.88;}
+  .gantt-bar.is-project-bar{height:26px;opacity:1;}
+  .gantt-row.is-step .gantt-bar{height:18px;border-radius:3px;box-shadow:0 1px 2px rgba(25,21,32,.08);}
+  .gantt-row.is-step .gantt-bar-label{font-size:10.5px;padding:0 9px;}
+  .gantt-bar.is-sprint-bar{background:transparent;border:1.5px dashed var(--text-muted);height:10px;box-shadow:none;}
+  .gantt-bar-handle{display:none;}
   .gantt-row.is-clickable{cursor:pointer;}
-  .gantt-row.is-clickable:hover .gantt-track{background:var(--gridline);}
-  .gantt-row.is-highlighted .gantt-label{background:color-mix(in srgb, var(--series-1) 16%, var(--surface-1));}
-  .gantt-row.is-highlighted .gantt-track{background:color-mix(in srgb, var(--series-1) 8%, transparent);}
-  .gantt-bar.is-highlighted{outline:2px solid var(--series-1);outline-offset:1px;animation:gantt-highlight-pulse 1.6s ease-in-out 2;}
-  @keyframes gantt-highlight-pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb, var(--series-1) 55%, transparent);}50%{box-shadow:0 0 0 5px color-mix(in srgb, var(--series-1) 0%, transparent);}}
+  .gantt-row.is-clickable:hover .gantt-track,.gantt-row.is-clickable:hover .gantt-label{background:color-mix(in srgb, var(--series-1) 6%, var(--surface-1));}
+  /* "Show in timeline": the chosen step stays crisp and tinted, its parents (project/sprint/owner)
+     stay readable, everything else steps back. */
+  .gantt-wrap.has-highlight .gantt-row:not(.is-highlighted):not(.is-hl-anc){opacity:.28;}
+  .gantt-row.is-highlighted .gantt-label,.gantt-row.is-highlighted .gantt-track{background:color-mix(in srgb, var(--series-1) 13%, var(--surface-1));}
+  .gantt-row.is-highlighted .gantt-label .gl-title{color:var(--text-primary);font-weight:600;}
+  .gantt-bar.is-highlighted{outline:2px solid var(--series-1);outline-offset:2px;animation:gantt-highlight-pulse 1.6s ease-in-out 2;}
+  @keyframes gantt-highlight-pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb, var(--series-1) 55%, transparent);}50%{box-shadow:0 0 0 6px color-mix(in srgb, var(--series-1) 0%, transparent);}}
 
   /* Gantt toolbar (search / status filter / person filter / zoom) — shared by the
      per-project Gantt and admin's combined timeline. */
@@ -546,12 +573,17 @@
   @media (max-width:760px){
     .gantt-scale-group{margin-left:0;}
   }
-  .gantt-header{display:flex;position:sticky;top:0;background:var(--surface-1);z-index:2;border-bottom:1px solid var(--border);}
-  .gantt-header .gantt-label{background:var(--surface-1);}
-  .gantt-ticks{position:relative;flex:1;min-height:30px;}
-  .gantt-tick{position:absolute;top:0;bottom:0;border-left:1px solid var(--gridline);padding:6px 0 0 5px;
-    font-size:10.5px;color:var(--text-muted);white-space:nowrap;}
-  .gantt-today{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed var(--status-critical);z-index:1;}
+  .gantt-header{display:flex;position:sticky;top:0;background:var(--surface-1);z-index:4;border-bottom:1px solid var(--border);}
+  .gantt-header .gantt-label{background:var(--surface-1);padding:0;min-height:44px;}
+  .gantt-ticks{position:relative;flex:1;min-height:44px;}
+  .gantt-tick{position:absolute;top:0;bottom:0;border-left:1px solid var(--gridline);padding:9px 0 0 7px;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--text-muted);white-space:nowrap;}
+  .gantt-today{position:absolute;top:0;bottom:0;width:1px;background:var(--status-serious);opacity:.6;z-index:2;pointer-events:none;}
+  .gantt-ticks .gantt-today{opacity:1;}
+  .gantt-ticks .gantt-today::after{content:"TODAY";position:absolute;bottom:4px;left:50%;transform:translateX(-50%);
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:9px;letter-spacing:.12em;color:#fff;
+    background:var(--status-serious);padding:1px 6px;border-radius:3px;white-space:nowrap;}
   .gantt-body{position:relative;}
   .gantt-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--text-secondary);margin-top:12px;}
   .gantt-legend span{display:inline-flex;align-items:center;gap:6px;}
@@ -565,18 +597,12 @@
   .gantt-caret:hover{color:var(--text-primary);}
   @media (max-width:760px){
     .project-grid{grid-template-columns:1fr 1fr;}
-    .gantt-label{width:150px;}
-    .gantt-label.is-step{padding-left:14px;}
+    .gantt-wrap{--gl:170px;}
   }
 
   /* ---------- timeline drag-to-pan + entity info popup ---------- */
   .gantt-wrap.is-pannable{cursor:grab;}
   .gantt-wrap.is-pannable.is-dragging{cursor:grabbing;user-select:none;}
-  .gantt-label.is-owner{font-weight:700;color:var(--text-primary);background:var(--surface-1);cursor:pointer;}
-  .gantt-label.is-owner:hover{background:var(--page);}
-  .gantt-row.is-owner .gantt-track{background:var(--surface-1);}
-  .gantt-label.is-project{cursor:pointer;}
-  .gantt-bar.is-project-bar{height:14px;top:9px;opacity:.92;}
   #entity-info-overlay .modal{max-width:400px;}
   .info-kind{font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--series-1);margin-bottom:4px;}
   .info-title{font-size:16.5px;font-weight:700;margin:0 0 10px;line-height:1.3;}
@@ -585,30 +611,24 @@
   .info-row .v{color:var(--text-primary);font-weight:600;text-align:right;}
   .info-row .v.info-desc{font-weight:400;white-space:pre-wrap;}
 
-  /* ---------- calendar: multi-day spanning bars (Projects tab + single-project calendar
-     only — scoped under .cal-grid-span so the unrelated Overview month-calendar, which
-     shares the plain .cal-grid/.cal-day classes, is never affected). A seamless bordered
-     grid (gap:1px hairlines) replaces the individually-carded .cal-day so a bar can visibly
-     run across several days in one continuous strip. */
-  .cal-grid-span{gap:1px;background:var(--gridline);border:1px solid var(--gridline);border-radius:8px;overflow:hidden;}
-  .cal-grid-span .cal-dow{background:var(--surface-1);padding:6px 0;margin:0;}
-  .cal-grid-span .cal-day{min-height:0;border-radius:0;border:none;background:var(--page);padding:5px 5px 4px;position:relative;}
-  .cal-grid-span .cal-day.cal-has-tasks{background:var(--surface-1);}
-  .cal-grid-span .cal-day.cal-outside{opacity:1;background:var(--page);}
-  .cal-grid-span .cal-day.cal-outside .cal-daynum{color:var(--text-muted);}
-  .cal-grid-span .cal-day.cal-today{border:none;}
-  .cal-grid-span .cal-day.cal-today .cal-daynum{background:var(--series-1);color:#fff;border-radius:50%;
-    width:18px;height:18px;display:flex;align-items:center;justify-content:center;}
-  .cal-week{grid-column:1/-1;display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--gridline);position:relative;}
-  .cal-span-bars{position:absolute;left:0;right:0;top:24px;bottom:4px;padding:0 2px;}
-  .cal-span-bar{position:absolute;height:16px;border-radius:4px;display:flex;align-items:center;gap:4px;
-    overflow:hidden;cursor:pointer;top:0;}
-  .cal-span-bar span{font-size:10px;font-weight:650;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:4px;}
-  .cal-span-bar .av{width:12px;height:12px;border-radius:50%;background:rgba(255,255,255,.32);color:#fff;font-size:7px;font-weight:800;
-    display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:3px;}
+  /* ---------- calendar: one circle per day (Projects tab + single-project calendar only — scoped
+     under .cal-grid-span so the Overview month-calendar, which shares the plain .cal-grid/.cal-day
+     classes, is never affected). No grid lines; a day with steps gets a filled circle. */
+  .cal-grid-span{gap:6px 0;padding:4px 0;}
+  .cal-grid-span .cal-dow{padding:0 0 6px;font-size:11px;letter-spacing:.06em;}
+  .cal-grid-span .cal-day{min-height:0;height:54px;border:none;background:none;border-radius:10px;padding:0;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;transform:none;}
+  .cal-grid-span .cal-day:hover{background:color-mix(in srgb, var(--series-1) 7%, transparent);transform:none;border:none;}
+  .cal-grid-span .cal-day.cal-outside{opacity:.38;}
+  .cal-circle{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--text-secondary);transition:transform .12s ease;}
+  .cal-day.cal-has-tasks .cal-circle{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.28);box-shadow:0 1px 2px rgba(25,21,32,.1),0 6px 16px -8px rgba(25,21,32,.35);}
+  .cal-day:hover .cal-circle{transform:scale(1.06);}
+  .cal-grid-span .cal-day.cal-today .cal-circle{box-shadow:0 0 0 2px var(--surface-1),0 0 0 4px var(--text-primary);font-weight:700;color:var(--text-primary);}
+  .cal-grid-span .cal-day.cal-today.cal-has-tasks .cal-circle{color:#fff;}
   @media (max-width:760px){
-    .cal-span-bar{height:13px;}
-    .cal-span-bar span{font-size:8.5px;}
+    .cal-grid-span .cal-day{height:44px;}
+    .cal-circle{width:36px;height:36px;font-size:14px;}
   }
 </style>
 </head>
@@ -850,7 +870,7 @@
     <div class="card-panel">
       <div class="cal-grid cal-grid-span" id="proj-calendar"></div>
       <div class="heat-legend" style="flex-wrap:wrap;margin-top:12px;">
-        <span>&nbsp;·&nbsp; each bar spans the days a step is due, colored by its project — click a bar for details</span>
+        <span>&nbsp;·&nbsp; a filled circle means steps are active that day (colored by project, split when several) — click any day to see them</span>
       </div>
     </div>
 
@@ -914,7 +934,7 @@
     <div class="card-panel">
       <div class="cal-grid cal-grid-span" id="pd-calendar"></div>
       <div class="heat-legend" style="flex-wrap:wrap;margin-top:12px;">
-        <span>&nbsp;·&nbsp; each bar spans the days a step is due — click a bar for details</span>
+        <span>&nbsp;·&nbsp; a filled circle means steps are active that day — click any day to see them</span>
       </div>
     </div>
 
@@ -3680,65 +3700,39 @@
     }
     var todayIso = todayISO();
     var header = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(function(l){ return '<div class="cal-dow">'+l+'</div>'; }).join('');
-
     var steps = (opts.steps||[]).filter(function(s){ return s.startDate && s.endDate; });
-    var weeks = [];
-    for(var w=0; w<days.length; w+=7) weeks.push(days.slice(w,w+7));
 
-    var weeksHtml = weeks.map(function(week){
-      var weekStartIso = toISODate(week[0]), weekEndIso = toISODate(week[6]);
-      var dayCellsHtml = week.map(function(d){
-        var iso = toISODate(d);
-        var outside = d.getMonth() !== first.getMonth();
-        var isToday = iso === todayIso;
-        var tip = d.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'});
-        return '<div class="cal-day'+(outside?' cal-outside':'')+(isToday?' cal-today':'')+'" '+
-          'data-tip="'+esc(tip)+' — click for the full list" data-cal-day="'+iso+'" tabindex="0" role="button" aria-label="'+esc(tip)+'">'+
-          '<div class="cal-daynum">'+d.getDate()+'</div></div>';
-      }).join('');
-
-      var overlapping = steps.filter(function(s){ return s.startDate<=weekEndIso && s.endDate>=weekStartIso; })
-        .sort(function(a,b){ return a.startDate.localeCompare(b.startDate); });
-      var lanes = [];
-      overlapping.forEach(function(s){
-        var placed = false;
-        for(var li=0; li<lanes.length; li++){
-          if(lanes[li] <= s.startDate){ lanes[li] = s.endDate; s.__lane = li; placed = true; break; }
-        }
-        if(!placed){ lanes.push(s.endDate); s.__lane = lanes.length-1; }
-      });
-      var barsHtml = overlapping.map(function(s){
-        var clipStart = s.startDate < weekStartIso ? weekStartIso : s.startDate;
-        var clipEnd = s.endDate > weekEndIso ? weekEndIso : s.endDate;
-        var colStart = daysBetweenIso(weekStartIso, clipStart);
-        var colSpan = daysBetweenIso(clipStart, clipEnd) + 1;
-        var leftPct = (colStart/7)*100, widthPct = (colSpan/7)*100;
-        var owner = opts.showAvatar ? (projectById(s.projectId)||{}).ownerName : '';
-        var av = owner ? '<span class="av" data-tip="'+esc(owner)+'">'+esc(owner.trim().charAt(0).toUpperCase())+'</span>' : '';
-        var tip = esc(s.name)+' · '+esc(s.status||'Not Started')+' · '+fmtDateShort(s.startDate)+' – '+fmtDateShort(s.endDate);
-        return '<div class="cal-span-bar" data-open-entity="step:'+esc(s.id)+'" data-tip="'+tip+'" '+
-          'style="left:calc('+leftPct+'% + 2px);width:calc('+widthPct+'% - 4px);top:'+(s.__lane*18)+'px;background:'+projectColor(s.projectId)+';">'+av+'<span>'+esc(s.name)+'</span></div>';
-      }).join('');
-      var rowHeight = Math.max(58, 24 + lanes.length*18 + 8);
-      return '<div class="cal-week" style="min-height:'+rowHeight+'px;">'+dayCellsHtml+
-        '<div class="cal-span-bars">'+barsHtml+'</div></div>';
+    var cellsHtml = days.map(function(d){
+      var iso = toISODate(d);
+      var outside = d.getMonth() !== first.getMonth();
+      var isToday = iso === todayIso;
+      var active = steps.filter(function(s){ return s.startDate<=iso && s.endDate>=iso; });
+      // One circle per day: filled with the project's colour when every step that day belongs to
+      // one project, or sliced evenly across the projects involved when they differ.
+      var ids = [], seen = {};
+      active.forEach(function(s){ if(!seen[s.projectId]){ seen[s.projectId]=1; ids.push(s.projectId); } });
+      var bg = '';
+      if(ids.length === 1) bg = projectColor(ids[0]);
+      else if(ids.length > 1){
+        var stops = ids.slice(0,4).map(function(id,k,arr){ return projectColor(id)+' '+(100*k/arr.length)+'% '+(100*(k+1)/arr.length)+'%'; });
+        bg = 'conic-gradient('+stops.join(',')+')';
+      }
+      var label = d.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'});
+      var tip = label+(active.length ? ' — '+active.length+' step'+(active.length===1?'':'s') : ' — no steps');
+      return '<div class="cal-day'+(outside?' cal-outside':'')+(isToday?' cal-today':'')+(active.length?' cal-has-tasks':'')+'" '+
+        'data-tip="'+esc(tip)+'" data-cal-day="'+iso+'" tabindex="0" role="button" aria-label="'+esc(tip)+'">'+
+        '<span class="cal-circle"'+(bg ? ' style="background:'+bg+';"' : '')+'>'+d.getDate()+'</span></div>';
     }).join('');
 
     var el = document.getElementById(opts.calId);
-    el.innerHTML = header + weeksHtml;
+    el.innerHTML = header + cellsHtml;
     bindTooltips(el);
     document.getElementById(opts.labelId).textContent = first.toLocaleDateString(undefined,{month:'long',year:'numeric'});
     if(opts.todayBtnId) document.getElementById(opts.todayBtnId).toggleAttribute('hidden', monthYm === todayMonth());
+    // The whole cell (circle included) opens that day's step list.
     el.querySelectorAll('[data-cal-day]').forEach(function(cell){
       cell.addEventListener('click', function(){ openProjDayDetail(cell.getAttribute('data-cal-day'), steps); });
       cell.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openProjDayDetail(cell.getAttribute('data-cal-day'), steps); } });
-    });
-    el.querySelectorAll('[data-open-entity]').forEach(function(bar){
-      bar.addEventListener('click', function(e){
-        e.stopPropagation();
-        var parts = bar.getAttribute('data-open-entity').split(':');
-        openEntityInfo_(parts[0], parts.slice(1).join(':'));
-      });
     });
   }
   function renderProjectsCalendar(){
@@ -3841,7 +3835,8 @@
    *  visible range, per-day pixel offset function, week tick marks, and a "today" marker
    *  — used by both the single-project Gantt and the admin's combined timeline below so
    *  the two stay visually identical. */
-  var GANTT_DAY_PX = 26, GANTT_LABEL_PX = 220;
+  var GANTT_DAY_PX = 26;
+  function ganttLabelPx_(){ return window.innerWidth <= 760 ? 170 : 270; }
   // Zoom presets for the "Weeks / Months / Quarters" toolbar switcher — each sets a base
   // pixels-per-day AND how far apart the ruler ticks fall / how they're labeled. Auto Fit
   // (the default) ignores these and instead computes a day-width that makes the whole date
@@ -3871,7 +3866,7 @@
    *  a fixed base width, further nudged by the manual +/− zoom multiplier. */
   function resolveGanttDayPx_(dateRange, ui, wrapEl){
     if(ui.autoFit){
-      var avail = Math.max(240, (wrapEl && wrapEl.clientWidth || 760) - GANTT_LABEL_PX - 4);
+      var avail = Math.max(240, (wrapEl && wrapEl.clientWidth || 760) - ganttLabelPx_() - 4);
       return Math.min(60, Math.max(2, avail / dateRange.totalDays));
     }
     var preset = GANTT_SCALES[ui.scale] || GANTT_SCALES.weeks;
@@ -4039,6 +4034,20 @@
       setTimeout(function(){ wrap.__justDragged = false; }, 0);
     });
   }
+  /** One label cell for any row of the timeline tree (owner / project / sprint / step): a chevron
+   *  (rotates when open; spacer for leaf rows), optional colour dot or avatar, a title and a small
+   *  mono sub-line (dates, counts). o: {kind, indent, open(true|false|null), dot, avatar, title,
+   *  sub, actions}. Click handling lives on the row, not here. */
+  var GL_CHEV = '<svg class="gl-chev{O}" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3.5L10.5 8L6 12.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function ganttLabelHtml_(o){
+    return '<div class="gantt-label is-'+o.kind+'" style="padding-left:'+o.indent+'px;"'+(o.attr||'')+'>'+
+      '<div class="gl-main">'+
+        (o.open === null ? '<span class="gl-chev-spacer"></span>' : GL_CHEV.replace('{O}', o.open ? ' is-open' : ''))+
+        (o.dot ? '<span class="gl-dot" style="background:'+o.dot+'"></span>' : '')+(o.avatar || '')+
+        '<span class="gl-text"><span class="gl-title" data-tip="'+esc(o.title)+'">'+esc(o.title)+'</span>'+
+        (o.sub ? '<span class="gl-sub">'+esc(o.sub)+'</span>' : '')+'</span>'+
+      '</div>'+(o.actions ? '<span class="sprint-group-actions">'+o.actions+'</span>' : '')+'</div>';
+  }
   /** Solid colored bar spanning a plain {start,end} range (a whole project's span, derived
    *  from its sprints — see projectDateRange) — same visual language as ganttMemberPillHtml_
    *  but for a range object rather than a sprint record. */
@@ -4103,6 +4112,13 @@
     var offsetPx = scale.offsetPx, totalPx = scale.totalPx, todayLine = scale.todayLine;
 
     var rowsHtml = [];
+    // Ancestors of the highlighted step (owner/project/sprint) — kept un-faded by .has-highlight.
+    var hl = {};
+    if(state.tl.highlightStep){
+      var hlSt = stepById(state.tl.highlightStep), hlSp = hlSt && sprintById(hlSt.sprintId);
+      hl.sprintId = hlSp && hlSp.id; hl.projectId = hlSp && hlSp.projectId;
+      var hlPr = hl.projectId && projectById(hl.projectId); hl.owner = hlPr && (hlPr.ownerName || 'Unassigned');
+    }
 
     function pushSprint(sp, level, ownerMatches, projectMatches){
       var steps = stepsForSprint(sp.id);
@@ -4113,17 +4129,12 @@
       var expanded = !!state.tl.expandedSprint[sp.id];
       var forceExpand = !!q && !ownerMatches && !projectMatches && !sprintMatches && matchingSteps.length > 0;
       var showSteps = expanded || forceExpand;
-      var indent = 10 + level*16, stepIndent = 10 + (level+1)*16;
-      rowsHtml.push('<div class="gantt-row is-sprint is-clickable" data-toggle-sprint="'+esc(sp.id)+'">'+
-        '<div class="gantt-label is-sprint" style="padding-left:'+indent+'px;"><div class="sprint-group-head">'+
-        '<span class="gantt-caret" aria-hidden="true" data-tip="'+(showSteps?'Hide':'Show')+' this sprint\'s steps">'+(showSteps?'▾':'▸')+'</span>'+
-        (level>0 ? '<span class="project-dot" style="background:'+projectColor(sp.projectId)+'"></span>' : '')+
-        '<span class="gantt-label-name" data-tip="'+esc(sp.name)+'">'+esc(sp.name)+(steps.length?' ('+steps.length+')':'')+'</span>'+
-        '<span class="sprint-group-actions">'+
-        (opts.scope==='single' ? '<button class="icon-btn" data-add-step="'+esc(sp.id)+'" data-tip="Add step to this sprint">+ step</button>' : '')+
-        '<button class="icon-btn" data-edit-sprint="'+esc(sp.id)+'" data-tip="Edit this sprint">✎</button>'+
-        '</span>'+
-        '</div></div>'+
+      var indent = 12 + level*18, stepIndent = 12 + (level+1)*18;
+      var spSub = (sp.startDate ? fmtDateShort(sp.startDate)+' – '+fmtDateShort(sp.endDate||sp.startDate)+' · ' : '')+steps.length+' step'+(steps.length===1?'':'s');
+      var spActions = (opts.scope==='single' ? '<button class="icon-btn" data-add-step="'+esc(sp.id)+'" data-tip="Add step to this sprint">+ step</button>' : '')+
+        '<button class="icon-btn" data-edit-sprint="'+esc(sp.id)+'" data-tip="Edit this sprint">✎</button>';
+      rowsHtml.push('<div class="gantt-row is-sprint is-clickable'+(hl.sprintId===sp.id?' is-hl-anc':'')+'" data-toggle-sprint="'+esc(sp.id)+'">'+
+        ganttLabelHtml_({kind:'sprint', indent:indent, open:showSteps, dot: level>0 ? projectColor(sp.projectId) : '', title:sp.name, sub:spSub, actions:spActions})+
         '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttMemberPillHtml_(sp, offsetPx, dayPx, projectColor(sp.projectId))+todayLine+'</div>'+
         '</div>');
       if(!showSteps) return;
@@ -4134,16 +4145,16 @@
       });
       if(!visibleSteps.length){
         rowsHtml.push('<div class="gantt-row is-step"><div class="gantt-label is-step" style="padding-left:'+stepIndent+'px;">'+
-          '<span class="gantt-label-name" style="font-style:italic;color:var(--text-muted);">'+(steps.length?'No steps match':'No steps yet')+'</span></div>'+
+          '<span class="gl-chev-spacer"></span><span class="gl-title" style="font-style:italic;color:var(--text-muted);">'+(steps.length?'No steps match':'No steps yet')+'</span></div>'+
           '<div class="gantt-track" style="width:'+totalPx+'px;">'+todayLine+'</div></div>');
         return;
       }
       visibleSteps.forEach(function(st){
         var isHl = state.tl.highlightStep === st.id;
+        var stSub = (st.status||'Not Started')+' · '+fmtDateShort(st.startDate)+(st.endDate && st.endDate!==st.startDate ? ' – '+fmtDateShort(st.endDate) : '');
         rowsHtml.push('<div class="gantt-row is-step'+(isHl?' is-highlighted':'')+'">'+
-          '<div class="gantt-label is-step" style="padding-left:'+stepIndent+'px;" data-open-entity="step:'+esc(st.id)+'"><span class="gantt-label-name" data-tip="'+esc(st.name)+'">'+esc(st.name)+'</span>'+
-          (isHl ? '<button class="icon-btn" data-clear-highlight data-tip="Clear this highlight">✕</button>' : '')+
-          '</div>'+
+          ganttLabelHtml_({kind:'step', indent:stepIndent, open:null, title:st.name, sub:stSub, attr:' data-open-entity="step:'+esc(st.id)+'"',
+            actions: isHl ? '<button class="icon-btn" data-clear-highlight data-tip="Clear this highlight">✕</button>' : ''})+
           '<div class="gantt-track" style="width:'+totalPx+'px;">'+ganttStepBarHtml_(st, offsetPx, dayPx, isHl)+todayLine+'</div>'+
           '</div>');
       });
@@ -4163,20 +4174,17 @@
       var showChildren = q ? (expanded || relevantHere.length > 0) : expanded;
       var range = projectDateRange(p);
       var color = projectColor(p.id);
-      var indent = 10 + level*16;
-      rowsHtml.push('<div class="gantt-row is-sprint is-clickable" data-toggle-project="'+esc(p.id)+'">'+
-        '<div class="gantt-label is-project" style="padding-left:'+indent+'px;"><div class="sprint-group-head">'+
-        '<span class="gantt-caret" aria-hidden="true">'+(showChildren?'▾':'▸')+'</span>'+
-        '<span class="project-dot" style="background:'+color+'"></span>'+
-        '<span class="gantt-label-name" data-tip="'+esc(p.name)+'">'+esc(p.name)+(sprints.length?' ('+sprints.length+')':'')+'</span>'+
-        (opts.scope!=='single' ? '<span class="sprint-group-actions"><button class="icon-btn" data-open-project="'+esc(p.id)+'" data-tip="Open this project">↗</button></span>' : '')+
-        '</div></div>'+
+      var indent = 12 + level*18;
+      var pSub = (range ? fmtDateShort(range.start)+' – '+fmtDateShort(range.end)+' · ' : '')+sprints.length+' sprint'+(sprints.length===1?'':'s');
+      rowsHtml.push('<div class="gantt-row is-project is-clickable'+(hl.projectId===p.id?' is-hl-anc':'')+'" data-toggle-project="'+esc(p.id)+'">'+
+        ganttLabelHtml_({kind:'project', indent:indent, open:showChildren, dot:color, title:p.name, sub:pSub,
+          actions: opts.scope!=='single' ? '<button class="icon-btn" data-open-project="'+esc(p.id)+'" data-tip="Open this project">↗</button>' : ''})+
         '<div class="gantt-track" style="width:'+totalPx+'px;">'+(range?ganttProjectBarHtml_(range, offsetPx, dayPx, color, p.name):'')+todayLine+'</div>'+
         '</div>');
       if(!showChildren) return;
       if(!sprints.length){
-        rowsHtml.push('<div class="gantt-row is-step"><div class="gantt-label is-step" style="padding-left:'+(indent+16)+'px;">'+
-          '<span class="gantt-label-name" style="font-style:italic;color:var(--text-muted);">No sprints yet</span></div>'+
+        rowsHtml.push('<div class="gantt-row is-step"><div class="gantt-label is-step" style="padding-left:'+(indent+18)+'px;">'+
+          '<span class="gl-chev-spacer"></span><span class="gl-title" style="font-style:italic;color:var(--text-muted);">No sprints yet</span></div>'+
           '<div class="gantt-track" style="width:'+totalPx+'px;">'+todayLine+'</div></div>');
         return;
       }
@@ -4199,12 +4207,9 @@
         var showChildren = q ? (expanded || anyRelevant) : expanded;
         var sprintTotal = 0;
         projects.forEach(function(p){ sprintTotal += sprintsForProject(p.id).length; });
-        rowsHtml.push('<div class="gantt-row is-owner is-clickable" data-toggle-owner="'+esc(owner)+'">'+
-          '<div class="gantt-label is-owner"><div class="sprint-group-head">'+
-          '<span class="gantt-caret" aria-hidden="true">'+(showChildren?'▾':'▸')+'</span>'+
-          '<span class="avatar-sm" style="background:'+studentColor(owner)+'">'+initials(owner)+'</span>'+
-          '<span class="gantt-label-name" data-tip="'+esc(owner)+'">'+esc(owner)+(sprintTotal?' ('+sprintTotal+' sprint'+(sprintTotal===1?'':'s')+')':'')+'</span>'+
-          '</div></div>'+
+        rowsHtml.push('<div class="gantt-row is-owner is-clickable'+(hl.owner===owner?' is-hl-anc':'')+'" data-toggle-owner="'+esc(owner)+'">'+
+          ganttLabelHtml_({kind:'owner', indent:12, open:showChildren, avatar:'<span class="avatar-sm" style="background:'+studentColor(owner)+';margin-top:1px;">'+esc(initials(owner))+'</span>',
+            title:owner, sub:projects.length+' project'+(projects.length===1?'':'s')+(sprintTotal?' · '+sprintTotal+' sprint'+(sprintTotal===1?'':'s'):'')})+
           '<div class="gantt-track" style="width:'+totalPx+'px;">'+todayLine+'</div>'+
           '</div>');
         if(!showChildren) return;
@@ -4222,6 +4227,12 @@
       '<div class="gantt-body">'+rowsHtml.join('')+'</div>'
       : '<div class="project-empty">Nothing matches your search/filters.</div>';
     bindTooltips(wrap);
+    var hlShown = rowsHtml.join('').indexOf('is-highlighted') > -1;
+    wrap.classList.toggle('has-highlight', hlShown);
+    if(hlShown){
+      var tb = toolbarEl.querySelector('.gantt-toolbar');
+      if(tb) tb.insertAdjacentHTML('afterbegin', '<button type="button" class="gantt-filter-chip is-active" data-clear-highlight data-tip="Show every step at full strength again">✕ Clear highlight</button>');
+    }
 
     if(legendWrap){
       legendWrap.innerHTML = rootProjects.map(function(p){
@@ -4275,13 +4286,13 @@
         openEntityInfo_(parts[0], parts.slice(1).join(':'));
       });
     });
-    wrap.querySelectorAll('[data-clear-highlight]').forEach(function(btn){
+    [wrap, toolbarEl].forEach(function(root){ root.querySelectorAll('[data-clear-highlight]').forEach(function(btn){
       btn.addEventListener('click', function(e){
         e.stopPropagation();
         state.tl.highlightStep = null;
         renderTimelineTree_(opts);
       });
-    });
+    }); });
   }
 
   /** Read-only info card for a project/sprint/step (or, for admin, a team member row),
@@ -4381,7 +4392,10 @@
       wrapId = 'tl-summary-gantt';
     }
     requestAnimationFrame(function(){
-      var row = document.querySelector('#'+wrapId+' .is-highlighted');
+      var wrapEl = document.getElementById(wrapId);
+      var row = wrapEl.querySelector('.gantt-row.is-highlighted'), bar = wrapEl.querySelector('.gantt-bar.is-highlighted');
+      // Pan sideways so the bar isn't parked off-screen in a zoomed-in timeline, then bring the row into view.
+      if(bar) wrapEl.scrollLeft = Math.max(0, ganttLabelPx_() + bar.offsetLeft - (wrapEl.clientWidth - ganttLabelPx_())/3);
       if(row) row.scrollIntoView({block:'center', behavior:'smooth'});
     });
   }
