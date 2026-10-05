@@ -502,16 +502,17 @@
      outcome callout and a bordered step list. Scoped under .seq so nothing else is touched. ---------- */
   .card-panel.seq-flat{background:transparent;border:0;padding:0;}
   .seq-wrap{overflow:visible;}
-  .seq{--ground:#FAF8F5;--panel:#FFFFFF;--ink:#191520;--muted:#6E677C;--rule:#E5E0EA;--grid:#EFEBF2;--accent:#5B2A86;--soft:#F3EEF9;
-    --done:#0F7A5F;--w1:#B4530A;--w2:#6E3A9E;--lab:250px;--cols:8;
-    --shadow:0 1px 2px rgba(25,21,32,.05), 0 8px 24px -12px rgba(25,21,32,.16);
-    background:var(--ground);color:var(--ink);border:1px solid var(--rule);border-radius:8px;padding:2px 24px 22px;
+  .seq{--ground:var(--surface-1);--panel:var(--surface-1);--ink:var(--text-primary);--muted:var(--text-secondary);--rule:var(--border);--grid:var(--gridline);
+    --accent:var(--brand-deep);--soft:color-mix(in srgb, var(--series-1) 8%, var(--surface-1));
+    --done:#0F7A5F;--w1:#B4530A;--w2:var(--series-1);--lab:250px;--cols:8;
+    --shadow:0 1px 2px rgba(25,21,32,.08), 0 6px 16px -10px rgba(79,0,140,.35);
+    background:var(--surface-1);color:var(--ink);border:1px solid var(--border);border-radius:var(--radius);padding:2px 22px 20px;
     font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;}
-  @media (prefers-color-scheme:dark){ .seq{--ground:#131019;--panel:#1C1824;--ink:#F0ECF5;--muted:#A49CB3;--rule:#312A3D;--grid:#282232;--accent:#BC92E8;--soft:#241B31;
-    --done:#4BC49E;--w1:#E5943F;--w2:#B589E0;--shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 26px -14px rgba(0,0,0,.7);} }
+  @media (prefers-color-scheme:dark){ .seq{--accent:#c084ea;--done:#4BC49E;--w1:#E5943F;--soft:color-mix(in srgb, var(--series-1) 14%, var(--surface-1));
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 22px -12px rgba(0,0,0,.7);} }
   .seq *{box-sizing:border-box;}
-  .seq .bar-tools{display:flex;align-items:baseline;gap:14px;margin:30px 0 6px;flex-wrap:wrap;}
-  .seq .bar-tools h2{font-family:Newsreader,Georgia,serif;font-size:24px;font-weight:600;margin:0;color:var(--ink);}
+  .seq .bar-tools{display:flex;align-items:baseline;gap:14px;margin:22px 0 6px;flex-wrap:wrap;}
+  .seq .bar-tools h2{font-family:Newsreader,Georgia,serif;font-size:22px;font-weight:600;margin:0;color:var(--ink);}
   .seq .bar-tools .hint{color:var(--muted);font-size:13px;}
   .seq .bar-tools .pill{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:none;color:var(--accent);
     border:1px solid var(--rule);border-radius:100px;padding:6px 15px;cursor:pointer;}
@@ -539,7 +540,6 @@
   .seq .trk{height:26px;border-radius:4px;display:flex;align-items:center;padding:0 12px;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;color:#fff;
     text-shadow:0 1px 2px rgba(0,0,0,.28);letter-spacing:.01em;box-shadow:var(--shadow);transition:filter .15s ease;}
   .seq .rowbtn:hover .trk{filter:brightness(1.08);}
-  @media (prefers-color-scheme:dark){ .seq .trk{color:#141019;text-shadow:none;} }
   .seq .det{display:grid;grid-template-rows:0fr;transition:grid-template-rows .24s ease;border-bottom:1px solid var(--grid);position:relative;z-index:3;background:var(--ground);}
   .seq .det.open{grid-template-rows:1fr;}
   .seq .det>div{overflow:hidden;}
@@ -4270,7 +4270,7 @@
       var id = 'seq-'+opts.wrapId+'-'+(idN++);
       return '<button type="button" class="rowbtn lv'+o.level+(o.hlAnc?' hl-anc':'')+'" aria-expanded="'+(o.open?'true':'false')+'" aria-controls="'+id+'" data-seq-map="'+o.map+'" data-seq-key="'+esc(o.key)+'">'+
         '<span class="lab">'+SEQ_CHEV+'<span><span class="t">'+esc(o.title)+'</span><span class="s">'+esc(o.sub)+'</span></span></span>'+
-        (o.span ? '<span class="trk" style="grid-column:'+o.span.col+' / span '+o.span.n+';background:'+o.color+';">'+esc(o.barLabel)+'</span>' : '')+
+        (o.span ? '<span class="trk" title="'+esc(o.barLabel)+'" style="grid-column:'+o.span.col+' / span '+o.span.n+';background:'+o.color+';">'+esc(o.span.n < 3 && o.barShort ? o.barShort : o.barLabel)+'</span>' : '')+
         '</button>'+
         '<div class="det'+(o.nest?' nest':'')+(o.open?' open':'')+'" id="'+id+'"><div><div class="inner">'+o.inner+'</div></div></div>';
     }
@@ -4298,7 +4298,7 @@
       return row({ level: level, map:'p', key:p.id, open: !!state.tl.expandedProject[p.id], hlAnc: hl.projectId===p.id,
         title: p.name, sub: (scope==='team' || !isAdmin() ? '' : (p.ownerName ? p.ownerName+' · ' : ''))+sprints.length+' sprint'+(sprints.length===1?'':'s')+(range ? ' · ends '+seqDate_(range.end) : ''),
         span: range && spanOf(range.start, range.end), color: projectColor(p.id),
-        barLabel: st.total && st.done===st.total ? '✓ Delivered' : st.done+' / '+st.total+' steps done', inner: inner });
+        barLabel: st.total && st.done===st.total ? '✓ Delivered' : st.done+' / '+st.total+' steps done', barShort: st.total && st.done===st.total ? '✓' : st.done+'/'+st.total, inner: inner });
     }
     function sprintRow(sp){
       var steps = stepsForSprint(sp.id), done = steps.filter(seqDone_).length;
@@ -4309,7 +4309,7 @@
       return row({ level:0, map:'s', key:sp.id, open: !!state.tl.expandedSprint[sp.id], hlAnc: hl.sprintId===sp.id,
         title: sp.name, sub: (sp.startDate ? seqDate_(sp.startDate)+' – '+seqDate_(sp.endDate||sp.startDate)+' · ' : '')+steps.length+' step'+(steps.length===1?'':'s'),
         span: spanOf(sp.startDate, sp.endDate), color: projectColor(sp.projectId),
-        barLabel: steps.length && done===steps.length ? '✓ Delivered' : done+' / '+steps.length+' steps done', inner: inner });
+        barLabel: steps.length && done===steps.length ? '✓ Delivered' : done+' / '+steps.length+' steps done', barShort: steps.length && done===steps.length ? '✓' : done+'/'+steps.length, inner: inner });
     }
 
     var rowsHtml = '', firstCol = 'PROJECT';
@@ -4327,7 +4327,7 @@
         var inner = projects.map(function(p){ return projectRow(p, 1, true); }).join('');
         rowsHtml += row({ level:0, map:'o', key:owner, open: !!state.tl.expandedOwner[owner], hlAnc: hl.owner===owner, nest:true,
           title: owner, sub: projects.length+' project'+(projects.length===1?'':'s')+' · '+done+'/'+tot+' steps done',
-          span: spanOf(s0, e0), color: 'var(--w2)', barLabel: projects.length+' project'+(projects.length===1?'':'s'), inner: inner });
+          span: spanOf(s0, e0), color: 'var(--w2)', barLabel: projects.length+' project'+(projects.length===1?'':'s'), barShort: String(projects.length), inner: inner });
       });
     } else if(scope === 'mine'){
       rootProjects.forEach(function(p){ rowsHtml += projectRow(p, 0, false); });
