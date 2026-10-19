@@ -351,6 +351,12 @@
   .team-add-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--gridline);}
   .team-add-row input{flex:1;min-width:140px;}
   .team-empty{padding:20px 4px;color:var(--text-muted);font-size:13px;}
+  .team-hidden{margin-top:16px;padding-top:14px;border-top:1px solid var(--gridline);}
+  .team-hidden h4{margin:0 0 4px;font-size:13.5px;}
+  .team-hidden h4 span{color:var(--text-muted);font-weight:400;}
+  .team-hidden input[type=search]{width:100%;padding:8px 10px;font-size:13px;}
+  .team-row.is-hidden-row{background:color-mix(in srgb, var(--text-muted) 6%, var(--surface-1));}
+  .team-row.is-hidden-row .avatar-sm{opacity:.6;}
 
   /* modal */
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-start;justify-content:center;
@@ -806,14 +812,14 @@
 
     <div id="overview-workload">
       <div class="section-head" style="margin-top:22px;">
-        <h2>Workload by student</h2>
+        <h2>Workload by employee</h2>
         <span class="sub">status mix, bar length = task volume</span>
       </div>
       <div class="card-panel" id="overview-workload-panel"></div>
     </div>
 
     <div id="overview-bystudent">
-      <div class="section-head" style="margin-top:22px;"><h2>By student</h2></div>
+      <div class="section-head" style="margin-top:22px;"><h2>By employee</h2></div>
       <div class="card-grid" id="student-cards"></div>
     </div>
   </section>
@@ -835,7 +841,7 @@
     <div class="card-panel" id="weekly-rows"></div>
     <div class="section-head" style="margin-top:22px;"><h2>Tasks due this week</h2></div>
     <div class="filters">
-      <select id="wk-f-student"><option value="">All students</option></select>
+      <select id="wk-f-student"><option value="">All employees</option></select>
       <select id="wk-f-status">
         <option value="">All statuses</option>
         <option>Not Started</option><option>In Progress</option><option>Submitted</option>
@@ -850,7 +856,7 @@
     </div>
     <div class="card-panel">
       <table>
-        <thead><tr><th>Task</th><th>Student</th><th>Deadline</th><th>Status</th></tr></thead>
+        <thead><tr><th>Task</th><th>Employee</th><th>Deadline</th><th>Status</th></tr></thead>
         <tbody id="weekly-task-body"></tbody>
       </table>
     </div>
@@ -903,13 +909,13 @@
       </div>
     </div>
 
-    <div class="section-head" style="margin-top:22px;"><h2>Per-student — this month</h2></div>
+    <div class="section-head" style="margin-top:22px;"><h2>Per-employee — this month</h2></div>
     <div class="filters">
-      <input type="search" id="mo-f-student" placeholder="Filter by student name…">
+      <input type="search" id="mo-f-student" placeholder="Filter by employee name…">
     </div>
     <div class="card-panel">
       <table>
-        <thead><tr><th>Student</th><th>Completed</th><th>Total</th><th>Completion</th><th>On-time rate</th></tr></thead>
+        <thead><tr><th>Employee</th><th>Completed</th><th>Total</th><th>Completion</th><th>On-time rate</th></tr></thead>
         <tbody id="monthly-student-body"></tbody>
       </table>
     </div>
@@ -919,7 +925,7 @@
   <section class="view" id="view-all">
     <div class="section-head"><h2>All tasks</h2></div>
     <div class="filters">
-      <select id="f-student"><option value="">All students</option></select>
+      <select id="f-student"><option value="">All employees</option></select>
       <select id="f-status">
         <option value="">All statuses</option>
         <option value="__completed">Completed</option>
@@ -935,7 +941,7 @@
     </div>
     <div class="card-panel" style="padding:0;overflow:auto;">
       <table>
-        <thead><tr><th>Task</th><th>Student</th><th>Start</th><th>Deadline</th><th>Submitted</th><th>Status</th><th>Week</th></tr></thead>
+        <thead><tr><th>Task</th><th>Employee</th><th>Start</th><th>Deadline</th><th>Submitted</th><th>Status</th><th>Week</th></tr></thead>
         <tbody id="all-task-body"></tbody>
       </table>
     </div>
@@ -1061,7 +1067,7 @@
     <div class="sd-head">
       <div class="avatar" id="sd-avatar"></div>
       <div>
-        <h1 id="sd-name">Student</h1>
+        <h1 id="sd-name">Employee</h1>
         <div class="sc-badge"><i class="dot" id="sd-badge-dot"></i><span id="sd-badge-text"></span></div>
       </div>
     </div>
@@ -1129,7 +1135,7 @@
     <h3 id="task-modal-title">Add task</h3>
     <input type="hidden" id="f-parentId" value="">
     <div class="row2">
-      <div class="field"><label>Student name *</label><input list="student-list" id="f-studentName" placeholder="e.g. Alex Chen"></div>
+      <div class="field"><label>Employee name *</label><input list="student-list" id="f-studentName" placeholder="e.g. Alex Chen"></div>
       <div class="field"><label>Priority</label>
         <select id="f-priority"><option>Medium</option><option>Low</option><option>High</option></select>
       </div>
@@ -1200,11 +1206,17 @@
     <p class="meta-line" id="team-intro" style="margin:-6px 0 14px;">Add an email for anyone here and they'll get an automatic email the moment a new task is assigned to them. Names must match what's typed on their tasks (not case-sensitive).</p>
     <div class="team-list" id="team-list"></div>
     <div class="team-add-row" id="team-add-row">
-      <input type="text" id="team-new-name" placeholder="Student name" list="student-list">
+      <input type="text" id="team-new-name" placeholder="Employee name" list="student-list">
       <input type="email" id="team-new-email" placeholder="email@example.com">
       <input type="text" id="team-new-focus" placeholder="Focus area (optional)">
       <input type="text" id="team-new-passcode" placeholder="Personal passcode (optional)">
       <button class="btn btn-primary" id="btn-team-add">+ Add</button>
+    </div>
+    <div class="team-hidden" id="team-hidden-wrap" style="display:none;">
+      <h4>Hidden from your view <span id="team-hidden-count"></span></h4>
+      <p class="meta-line" style="margin:0 0 8px;">These people's accounts still exist and they can still sign in — you just don't see them (or their tasks and projects) in your own pages. Search to find someone and add them back with everything they had.</p>
+      <input type="search" id="team-hidden-search" placeholder="Search hidden employees by name, email or focus area…">
+      <div class="team-list" id="team-hidden-list" style="margin-top:8px;"></div>
     </div>
     <div class="modal-actions" style="justify-content:flex-end;">
       <button class="btn" id="team-done">Done</button>
@@ -1217,7 +1229,7 @@
   <div class="modal" style="max-width:660px;">
     <button class="close-x" id="report-close">✕</button>
     <h3>Generate report</h3>
-    <p class="meta-line" style="margin:-6px 0 0;">Builds an on-brand PowerPoint summary from your data and downloads it. Leave a filter empty to include everything for that criterion — filters combine (e.g. a date range AND a student).</p>
+    <p class="meta-line" style="margin:-6px 0 0;">Builds an on-brand PowerPoint summary from your data and downloads it. Leave a filter empty to include everything for that criterion — filters combine (e.g. a date range AND an employee).</p>
 
     <div class="field-group-label"><span>Date filters</span></div>
     <div class="row2">
@@ -1237,7 +1249,7 @@
 
     <div class="field-group-label"><span>Task filters</span><span class="filter-count" id="rf-filter-count"></span></div>
     <div class="field">
-      <div class="chip-row-head"><label>Students</label><span class="chip-quick-actions"><button type="button" data-chip-all="rf-students">All</button><button type="button" data-chip-none="rf-students">None</button></span></div>
+      <div class="chip-row-head"><label>Employees</label><span class="chip-quick-actions"><button type="button" data-chip-all="rf-students">All</button><button type="button" data-chip-none="rf-students">None</button></span></div>
       <div class="chip-check-row" id="rf-students"></div>
     </div>
     <div class="field">
@@ -1604,8 +1616,18 @@
 
   /* ---------- student color assignment (fixed categorical order) ---------- */
   var SERIES = ['--series-1','--series-2','--series-3','--series-4','--series-5','--series-6','--series-7','--series-8'];
+  /** Everyone the dashboards list: names on (visible) tasks, plus — for admin — everyone on the
+   *  team roster who isn't hidden, so a brand-new employee shows up straight away even before
+   *  they have a single task. */
   function studentNames(){
-    var set = {}; state.tasks.forEach(function(t){ if(t.studentName) set[t.studentName]=1; });
+    var set = {}, seen = {};
+    state.tasks.forEach(function(t){ if(t.studentName){ set[t.studentName]=1; seen[normName(t.studentName)]=1; } });
+    if(isAdmin()){
+      (state.students || []).forEach(function(r){
+        if(!r || !r.name || r.hidden || seen[normName(r.name)]) return;
+        seen[normName(r.name)] = 1; set[r.name] = 1;
+      });
+    }
     return Object.keys(set).sort();
   }
   function studentColor(name){
@@ -1647,6 +1669,33 @@
   function isAuthError(json){
     return !!(json && json.ok === false && /passphrase/i.test(json.error || ''));
   }
+
+  /** Everything the backend's GET returns goes through here. For admin, people marked
+   *  "hidden" (Team → Remove) are filtered out of tasks/projects/sprints/steps so every view —
+   *  dashboard, weekly, monthly, all tasks, projects — simply never sees them; the full roster
+   *  (hidden flag included) stays in state.students so Team can offer "Add back". */
+  function hiddenNameSet_(){
+    var set = {};
+    (state.students || []).forEach(function(s){ if(s && s.hidden) set[normName(s.name)] = 1; });
+    return set;
+  }
+  function isHiddenEmployee_(name){ return !!hiddenNameSet_()[normName(name)]; }
+  function applyVisibility_(data){
+    var hidden = hiddenNameSet_(), tasks = data.tasks || [], projects = data.projects || [], sprints = data.sprints || [], steps = data.steps || [];
+    if(Object.keys(hidden).length){
+      tasks = tasks.filter(function(t){ return !hidden[normName(t.studentName)]; });
+      projects = projects.filter(function(p){ return !hidden[normName(p.ownerName)]; });
+      var keep = {}; projects.forEach(function(p){ keep[p.id] = true; });
+      sprints = sprints.filter(function(sp){ return keep[sp.projectId]; });
+      steps = steps.filter(function(st){ return keep[st.projectId]; });
+    }
+    state.tasks = tasks; state.projects = projects; state.sprints = sprints; state.steps = steps;
+  }
+  function applyBundle_(json){
+    state.students = json.students || [];
+    applyVisibility_(json);
+  }
+
   function fetchTasks(){
     if(!CONFIG.API_URL){
       state.tasks = buildSample();
@@ -1657,8 +1706,7 @@
       if(json.ok){
         state.role = json.role || state.role;
         state.myName = json.studentName || '';
-        state.tasks = json.tasks || []; state.students = json.students || [];
-        state.projects = json.projects || []; state.sprints = json.sprints || []; state.steps = json.steps || [];
+        applyBundle_(json);
         updateRoleUI();
         saveDataCache(json);
       } else if(isAuthError(json)){
@@ -1745,12 +1793,7 @@
       if(json && json.ok){
         state.role = json.role;
         state.myName = json.studentName || '';
-        state.tasks = json.tasks || []; state.students = json.students || [];
-        // These three were missing here — fetchTasks() (used by Settings' "Save &
-        // connect") already populated them, but the actual sign-in path (this
-        // function) didn't, so Projects looked empty right after logging in until
-        // something else happened to call fetchTasks() and backfill them.
-        state.projects = json.projects || []; state.sprints = json.sprints || []; state.steps = json.steps || [];
+        applyBundle_(json);
         try{ localStorage.setItem(keyStorageName(), key); }catch(e){}
         saveDataCache(json);
         hideGate();
@@ -1778,8 +1821,7 @@
       if(json && json.ok){
         state.role = json.role || state.role;
         state.myName = json.studentName || '';
-        state.tasks = json.tasks || []; state.students = json.students || [];
-        state.projects = json.projects || []; state.sprints = json.sprints || []; state.steps = json.steps || [];
+        applyBundle_(json);
         updateRoleUI();
         renderAll();
         saveDataCache(json);
@@ -1808,8 +1850,7 @@
       // completes, then quietly refresh with live data in the background.
       CONFIG.KEY = stored;
       state.role = cached.role || ''; state.myName = cached.studentName || '';
-      state.tasks = cached.tasks || []; state.students = cached.students || [];
-      state.projects = cached.projects || []; state.sprints = cached.sprints || []; state.steps = cached.steps || [];
+      applyBundle_(cached);
       hideGate();
       updateRoleUI();
       renderAll();
@@ -1885,9 +1926,9 @@
     var onTimeRate = onTimeCount.length ? Math.round(100*onTimeCount.filter(function(t){return computeBadge(t).text!=='Late';}).length/onTimeCount.length) : null;
     var personal = isPersonal();
 
-    // A personal passcode's task list is already just their own — a "Students" count of 1
+    // A personal passcode's task list is already just their own — an "Employees" count of 1
     // is noise, and "Team on-time rate" reads oddly once "team" means "me".
-    var html = (personal ? '' : '<div class="stat-tile"><div class="num">'+students+'</div><div class="lbl">Students</div></div>')+
+    var html = (personal ? '' : '<div class="stat-tile"><div class="num">'+students+'</div><div class="lbl">Employees</div></div>')+
       '<div class="stat-tile"><div class="num">'+total+'</div><div class="lbl">Total tasks</div></div>'+
       statMeterTile({id:'completed', num:completed, sub:'of '+total, lbl:'Completed', pct: total?Math.round(100*completed/total):0, color:'var(--status-good)'})+
       statMeterTile({id:'overdue', num:overdue, sub:'of '+total, lbl:'Overdue', pct: total?Math.round(100*overdue/total):0, color:'var(--status-critical)'})+
@@ -2062,7 +2103,7 @@
     var panel = document.getElementById('overview-workload-panel');
     if(!panel) return;
     var names = studentNames();
-    if(!names.length){ panel.innerHTML = '<div class="muted" style="padding:6px 0;">No students yet — add a task to get started.</div>'; return; }
+    if(!names.length){ panel.innerHTML = '<div class="muted" style="padding:6px 0;">No employees yet — add a task or add someone in Team to get started.</div>'; return; }
     var byStudent = {};
     names.forEach(function(n){ byStudent[n] = {Completed:0,'In Progress':0,Upcoming:0,Blocked:0,Overdue:0,total:0}; });
     state.tasks.forEach(function(t){
@@ -2179,7 +2220,7 @@
   function renderStudentCards(){
     var names = studentNames();
     var el = document.getElementById('student-cards');
-    if(!names.length){ el.innerHTML = '<div class="muted" style="padding:20px;">No students yet — add a task to get started.</div>'; return; }
+    if(!names.length){ el.innerHTML = '<div class="muted" style="padding:20px;">No employees yet — add a task or add someone in Team to get started.</div>'; return; }
     el.innerHTML = names.map(function(name){
       var s = studentStats(name);
       return '<div class="student-card" data-student="'+esc(name)+'">'+
@@ -2208,7 +2249,7 @@
     var names = studentNames();
     var rowsEl = document.getElementById('weekly-rows');
     var weekTasks = state.tasks.filter(function(t){return t.deadline && weekKey(parseDate(t.deadline))===state.selectedWeek;});
-    if(!names.length){ rowsEl.innerHTML = '<div class="muted">No students yet.</div>'; }
+    if(!names.length){ rowsEl.innerHTML = '<div class="muted">No employees yet.</div>'; }
     else{
       rowsEl.innerHTML = names.map(function(name){
         var tasks = weekTasks.filter(function(t){return t.studentName===name;});
@@ -2224,7 +2265,7 @@
     }
     var wkStudentSel = document.getElementById('wk-f-student');
     var curSel = wkStudentSel.value;
-    wkStudentSel.innerHTML = '<option value="">All students</option>' + names.map(function(n){return '<option>'+esc(n)+'</option>';}).join('');
+    wkStudentSel.innerHTML = '<option value="">All employees</option>' + names.map(function(n){return '<option>'+esc(n)+'</option>';}).join('');
     wkStudentSel.value = curSel;
     renderWeeklyTaskTable(weekTasks);
   }
@@ -2319,7 +2360,7 @@
     var heat = document.getElementById('month-heatmap');
     heat.style.setProperty('--heat-cols', weeks.length);
     if(!names.length){
-      heat.innerHTML = '<div class="muted" style="padding:10px 0;">No students yet.</div>';
+      heat.innerHTML = '<div class="muted" style="padding:10px 0;">No employees yet.</div>';
     } else {
       var headerRow = '<div class="heat-header-row"><div></div>' +
         weeks.map(function(wk){ return '<div class="heat-col-lbl">'+weekShortLabel(wk)+'</div>'; }).join('') + '</div>';
@@ -2352,8 +2393,8 @@
     var q = document.getElementById('mo-f-student').value.trim().toLowerCase();
     var filtered = q ? names.filter(function(n){ return n.toLowerCase().indexOf(q) > -1; }) : names;
     var body = document.getElementById('monthly-student-body');
-    if(!names.length){ body.innerHTML = '<tr class="empty-row"><td colspan="5">No students yet.</td></tr>'; return; }
-    if(!filtered.length){ body.innerHTML = '<tr class="empty-row"><td colspan="5">No matching students.</td></tr>'; return; }
+    if(!names.length){ body.innerHTML = '<tr class="empty-row"><td colspan="5">No employees yet.</td></tr>'; return; }
+    if(!filtered.length){ body.innerHTML = '<tr class="empty-row"><td colspan="5">No matching employees.</td></tr>'; return; }
     body.innerHTML = filtered.map(function(name){
       var tasks = state.tasks.filter(function(t){return t.studentName===name && t.deadline && t.deadline.slice(0,7)===state.selectedMonth;});
       var completed = tasks.filter(function(t){return t.status==='Submitted'||t.status==='Approved';}).length;
@@ -2644,7 +2685,7 @@
     var sel = document.getElementById('f-student');
     var current = sel.value;
     var names = studentNames();
-    sel.innerHTML = '<option value="">All students</option>' + names.map(function(n){return '<option>'+esc(n)+'</option>';}).join('');
+    sel.innerHTML = '<option value="">All employees</option>' + names.map(function(n){return '<option>'+esc(n)+'</option>';}).join('');
     sel.value = current;
   }
 
@@ -2901,7 +2942,7 @@
     var taskName = document.getElementById('f-taskName').value.trim();
     var deadline = document.getElementById('f-deadline').value;
     if(!studentName || !taskName || !deadline){
-      showToast('Student name, task name, and deadline are required.');
+      showToast('Employee name, task name, and deadline are required.');
       return;
     }
     var submitLocal = document.getElementById('f-submitTime').value;
@@ -3106,8 +3147,13 @@
   /** Every name that's ever appeared on a task, plus every name already in the roster — so you can add an email for someone before they have a task, or notice who's still missing one. */
   function teamNames(){
     var seen = {}, out = [];
-    studentNames().forEach(function(n){ var k=normName(n); if(!seen[k]){seen[k]=1; out.push(n);} });
-    state.students.forEach(function(s){ var k=normName(s.name); if(!seen[k]){seen[k]=1; out.push(s.name);} });
+    // Prefer the roster's own spelling of a name over however it happens to be typed on a task.
+    studentNames().forEach(function(n){
+      var k=normName(n); if(seen[k]) return; seen[k]=1;
+      var r = state.students.find(function(x){ return normName(x.name)===k; });
+      out.push(r ? r.name : n);
+    });
+    state.students.forEach(function(s){ var k=normName(s.name); if(!seen[k] && !s.hidden){seen[k]=1; out.push(s.name);} });
     return out.sort(function(a,b){ return a.localeCompare(b); });
   }
   function normName(s){ return String(s||'').trim().toLowerCase(); }
@@ -3136,7 +3182,8 @@
     var names = teamNames();
     var el = document.getElementById('team-list');
     var admin = isAdmin();
-    if(!names.length){ el.innerHTML = '<div class="team-empty">No students yet — add one below, or add a task and come back.</div>'; return; }
+    renderHiddenList();
+    if(!names.length){ el.innerHTML = '<div class="team-empty">No employees yet — add one below, or add a task and come back.</div>'; return; }
     el.innerHTML = names.map(function(name){
       var email = studentEmail(name);
       var focusArea = studentFocusArea(name);
@@ -3162,7 +3209,7 @@
         '</div>'+
         (admin ? '<div class="team-row-actions">'+
           '<button class="btn" data-save-student="'+esc(name)+'">Save</button>'+
-          '<button class="btn btn-danger" data-delete-student="'+esc(name)+'">Remove</button>'+
+          '<button class="btn btn-danger" data-hide-employee="'+esc(name)+'" data-tip="Stop showing this person in your account (their account stays)">Remove</button>'+
           '</div>' : '')+
         '</div>';
     }).join('');
@@ -3177,14 +3224,44 @@
         saveStudent(name, email, focusArea, passcode);
       });
     });
-    el.querySelectorAll('[data-delete-student]').forEach(function(btn){
+    el.querySelectorAll('[data-hide-employee]').forEach(function(btn){
       btn.addEventListener('click', function(){
-        var name = btn.getAttribute('data-delete-student');
-        if(!confirm('Remove '+name+' from the team roster? Their tasks stay untouched — this only stops notification emails.')) return;
-        removeStudent(name);
+        var name = btn.getAttribute('data-hide-employee');
+        if(!confirm('Remove '+name+' from your view?\n\nTheir account, passcode and tasks are NOT deleted — they can still sign in. You just stop seeing them (and their tasks and projects) in your pages. You can add them back any time from "Hidden from your view" at the bottom of this window.')) return;
+        setEmployeeHidden(name, true);
       });
     });
+    bindTooltips(el);
   }
+  /** The "Hidden from your view" list at the bottom of Team (admin only): everyone you've
+   *  removed from your own pages, searchable, each with an Add back button. */
+  function renderHiddenList(){
+    var wrap = document.getElementById('team-hidden-wrap');
+    if(!isAdmin()){ wrap.style.display = 'none'; return; }
+    wrap.style.display = '';
+    var hiddenRows = state.students.filter(function(r){ return r && r.hidden; })
+      .sort(function(a,b){ return a.name.localeCompare(b.name); });
+    document.getElementById('team-hidden-count').textContent = hiddenRows.length ? '('+hiddenRows.length+')' : '';
+    var q = document.getElementById('team-hidden-search').value.trim().toLowerCase();
+    var rows = !q ? hiddenRows : hiddenRows.filter(function(r){
+      return (r.name||'').toLowerCase().indexOf(q) > -1 || (r.email||'').toLowerCase().indexOf(q) > -1 || (r.focusArea||'').toLowerCase().indexOf(q) > -1;
+    });
+    var el = document.getElementById('team-hidden-list');
+    if(!hiddenRows.length){ el.innerHTML = '<div class="team-empty" style="padding:8px 4px;">Nobody is hidden. Anyone you remove above will show up here so you can find and add them back.</div>'; return; }
+    if(!rows.length){ el.innerHTML = '<div class="team-empty" style="padding:8px 4px;">No hidden employee matches “'+esc(q)+'”.</div>'; return; }
+    el.innerHTML = rows.map(function(r){
+      return '<div class="team-row is-hidden-row" data-name="'+esc(r.name)+'">'+
+        '<span class="avatar-sm" style="background:'+studentColor(r.name)+'">'+initials(r.name)+'</span>'+
+        '<div class="team-row-main"><div class="team-row-name">'+esc(r.name)+'</div>'+
+        '<div class="team-row-name" style="font-weight:400;color:var(--text-secondary);margin:0;">'+(r.email ? esc(r.email) : 'No email on file')+(r.focusArea ? ' · '+esc(r.focusArea) : '')+'</div></div>'+
+        '<div class="team-row-actions"><button class="btn btn-primary" data-unhide-employee="'+esc(r.name)+'">Add back</button></div>'+
+        '</div>';
+    }).join('');
+    el.querySelectorAll('[data-unhide-employee]').forEach(function(btn){
+      btn.addEventListener('click', function(){ setEmployeeHidden(btn.getAttribute('data-unhide-employee'), false); });
+    });
+  }
+  document.getElementById('team-hidden-search').addEventListener('input', renderHiddenList);
   function saveStudent(name, email, focusArea, passcode){
     if(!name) return;
     if(SAMPLE){
@@ -3200,30 +3277,51 @@
       fetchTasks().then(renderTeamList);
     }).catch(function(){});
   }
-  function removeStudent(name){
+  /** Team → Remove / Add back. This never deletes an account: it only flips the "hidden" flag
+   *  the server keeps on the employee, so their passcode, email, tasks and projects stay exactly
+   *  as they are — you simply stop (or start again) seeing them in your own pages. */
+  function setEmployeeHidden(name, hidden){
+    var key = normName(name);
+    function flag(v){
+      var row = state.students.find(function(r){ return normName(r.name)===key; });
+      if(row) row.hidden = v; else if(v) state.students.push({name:name, email:'', focusArea:'', passcode:'', hidden:true});
+    }
     if(SAMPLE){
-      state.students = state.students.filter(function(s){ return normName(s.name)!==normName(name); });
-      renderTeamList(); renderStudentDatalist();
-      showToast('Removed (sample mode).');
+      flag(hidden);
+      if(hidden) applyVisibility_({tasks:state.tasks, projects:state.projects, sprints:state.sprints, steps:state.steps});
+      else applyVisibility_({tasks:buildSample(), projects:state.projects, sprints:state.sprints, steps:state.steps});
+      renderAll(); renderTeamList(); renderStudentDatalist();
+      showToast((hidden ? 'Removed from your view' : 'Added back')+' (sample mode).');
       return;
     }
-    apiCall('deleteStudent', {name:name}).then(function(res){
-      if(!res || res.ok===false){ showToast('Remove failed.'); return; }
-      showToast('Removed.');
-      fetchTasks().then(renderTeamList);
-    }).catch(function(){});
+    flag(hidden);                       // optimistic: the row moves between the two lists at once
+    renderTeamList();
+    apiCall('setEmployeeHidden', {name:name, hidden:!!hidden}).then(function(res){
+      if(!res || res.ok===false){
+        flag(!hidden); renderTeamList();
+        var why = res && res.error ? res.error : 'unknown error';
+        showToast(/Unknown action/i.test(why)
+          ? (hidden ? 'Remove' : 'Add back')+' needs the latest server update (the tracker-api function) — see DEPLOY-employees.md.'
+          : (hidden ? 'Remove' : 'Add back')+' failed: '+why);
+        return;
+      }
+      showToast(hidden ? name+' is hidden from your view — their account still works. Add them back any time below.' : name+' is back, with their tasks and projects.');
+      fetchTasks().then(function(){ renderTeamList(); renderStudentDatalist(); });
+    }).catch(function(){ flag(!hidden); renderTeamList(); showToast((hidden ? 'Remove' : 'Add back')+' failed — could not reach the server.'); });
   }
   function openTeamModal(){
     var admin = isAdmin();
     document.getElementById('team-add-row').style.display = admin ? '' : 'none';
     document.getElementById('team-intro').textContent = admin
-      ? 'Add an email, focus area, and personal passcode for anyone here. An email gets them an automatic notification the moment a new task is assigned (under the admin passphrase); a passcode lets them sign in to their own personal dashboard instead of the team-wide one. Names must match what\'s typed on their tasks (not case-sensitive).'
+      ? 'Add an email, focus area, and personal passcode for anyone here. An email gets them an automatic notification the moment a new task is assigned (under the admin passphrase); a passcode lets them sign in to their own personal dashboard instead of the team-wide one. Names must match what\'s typed on their tasks (not case-sensitive). "Remove" only hides someone from your own pages — their account keeps working, and you can add them back from the list at the bottom.'
       : 'Roster is view-only here — the admin passphrase is needed to add or edit anyone\'s details.';
     renderTeamList();
     document.getElementById('team-new-name').value = '';
     document.getElementById('team-new-email').value = '';
     document.getElementById('team-new-focus').value = '';
     document.getElementById('team-new-passcode').value = '';
+    document.getElementById('team-hidden-search').value = '';
+    renderHiddenList();
     teamOverlay.classList.add('show');
   }
   document.getElementById('btn-team').addEventListener('click', openTeamModal);
@@ -3235,7 +3333,8 @@
     var email = document.getElementById('team-new-email').value.trim();
     var focusArea = document.getElementById('team-new-focus').value.trim();
     var passcode = document.getElementById('team-new-passcode').value.trim();
-    if(!name){ showToast('Enter a student name first.'); return; }
+    if(!name){ showToast('Enter an employee name first.'); return; }
+    if(isHiddenEmployee_(name)){ showToast(name+' is already on your team but hidden — find them under “Hidden from your view” below and press Add back.'); return; }
     saveStudent(name, email, focusArea, passcode);
     document.getElementById('team-new-name').value = '';
     document.getElementById('team-new-email').value = '';
@@ -3712,13 +3811,16 @@
     toolbarEl.innerHTML = '';
     var owners = {};
     state.projects.forEach(function(p){ owners[p.ownerName || 'Unassigned'] = true; });
+    // Everyone on the roster gets a card too (not hidden), so a new employee is visible before their first project.
+    var haveOwner = {}; Object.keys(owners).forEach(function(n){ haveOwner[normName(n)] = true; });
+    (state.students || []).forEach(function(r){ if(r && r.name && !r.hidden && !haveOwner[normName(r.name)]){ owners[r.name] = true; haveOwner[normName(r.name)] = true; } });
     var names = Object.keys(owners).sort(function(a,b){ return a.localeCompare(b); });
     if(!names.length){
       gridEl.innerHTML = '<div class="project-empty">No projects yet — click "+ Add Project" above to create one.</div>';
       return;
     }
     gridEl.innerHTML = names.map(function(name){
-      var projects = state.projects.filter(function(p){ return (p.ownerName || 'Unassigned') === name; });
+      var projects = state.projects.filter(function(p){ return normName(p.ownerName || 'Unassigned') === normName(name); });
       var steps = [];
       projects.forEach(function(p){ steps = steps.concat(stepsForProject(p.id)); });
       var done = steps.filter(function(s){ return s.status==='Submitted'||s.status==='Approved'; }).length;
