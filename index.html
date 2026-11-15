@@ -478,6 +478,31 @@
     .tl-row.alt .tl-meta{justify-content:flex-start;}
   }
 
+  /* ---------- Private page ---------- */
+  #pageonly-shell{display:none;position:fixed;inset:0;z-index:90;flex-direction:column;background:var(--page);}
+  body.page-only #pageonly-shell{display:flex;}
+  body.page-only .wrap, body.page-only .brand-bar{display:none;}
+  .po-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 14px;background:var(--surface-1);border-bottom:1px solid var(--border);flex-shrink:0;}
+  .po-bar .po-name{font-size:14px;font-weight:700;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .po-body{flex:1;position:relative;background:#fff;min-height:0;}
+  .po-body iframe, .pv-frame-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff;}
+  .po-empty, .pv-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--text-muted);font-size:14px;background:var(--surface-1);}
+  .pv-status{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;}
+  .pv-chip{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:999px;font-size:12.5px;font-weight:600;border:1px solid var(--border);background:var(--surface-1);color:var(--text-secondary);}
+  .pv-chip::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--text-muted);}
+  .pv-chip.ok::before{background:var(--status-good);}
+  .pv-chip.bad::before{background:var(--stc-coral,#ff375e);}
+  .pv-settings{border:1px solid var(--border);border-radius:14px;padding:16px;background:color-mix(in srgb, var(--series-1) 3%, var(--surface-1));margin-bottom:14px;}
+  .pv-settings h4{margin:0 0 10px;font-size:13px;}
+  .pv-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:6px;}
+  .pv-row .field{flex:1;min-width:200px;margin-bottom:6px;}
+  .pv-hint{font-size:12px;color:var(--text-muted);line-height:1.5;margin:4px 0 12px;}
+  .pv-divider{border:none;border-top:1px solid var(--gridline);margin:14px 0;}
+  .pv-frame-wrap{position:relative;height:calc(100vh - 300px);min-height:460px;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;}
+  .pv-frame-wrap.is-full{position:fixed;inset:0;z-index:80;height:auto;border:0;border-radius:0;}
+  .pv-exit{display:none;position:absolute;top:10px;right:14px;z-index:3;}
+  .pv-frame-wrap.is-full .pv-exit{display:inline-flex;}
+
   /* modal */
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-start;justify-content:center;
     padding:5vh 16px;overflow:auto;z-index:50;}
@@ -888,6 +913,7 @@
     <button class="tab" data-view="all">All Tasks</button>
     <button class="tab" data-view="projects">Projects</button>
     <button class="tab" data-view="competitions">Competitions</button>
+    <button class="tab" data-view="private" id="tab-private" style="display:none;">Private page</button>
   </div>
 
   <!-- OVERVIEW -->
@@ -1143,6 +1169,43 @@
     </div>
     <div class="comp-chips" id="comp-chips"></div>
     <div class="comp-grid" id="comp-grid"></div>
+  </section>
+
+  <!-- PRIVATE PAGE (admin only) — a standalone HTML page that lives in the database; people who sign in
+       with its own password see ONLY that page. Shown here in a sandboxed frame. -->
+  <section class="view" id="view-private">
+    <div class="section-head">
+      <h2 id="pv-title">Private page</h2>
+      <span style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn" id="pv-settings-toggle">⚙ Page settings</button>
+        <button class="btn" id="pv-full">⛶ Full screen</button>
+      </span>
+    </div>
+    <div class="pv-status" id="pv-status"></div>
+    <div class="pv-settings" id="pv-settings" style="display:none;">
+      <div class="muted" id="pv-setup-warning" style="display:none;margin-bottom:12px;color:var(--stc-coral,#ff375e);font-weight:600;">The database table for this page does not exist yet — run <code>add-private-page.sql</code> in Supabase first.</div>
+      <h4>1 · The page</h4>
+      <div class="pv-row">
+        <div class="field"><label>Name (also the tab name)</label><input type="text" id="pv-title-input" maxlength="60" placeholder="Private page"></div>
+        <div class="field"><label>HTML file</label><input type="file" id="pv-file" accept=".html,.htm,text/html"></div>
+        <button class="btn btn-primary" id="pv-save" style="margin-bottom:6px;">Save page</button>
+      </div>
+      <div class="pv-hint" id="pv-file-note">Choose a self-contained .html file (images and styles embedded, or loaded from the internet). Saving replaces the current page. Up to about 4 MB.</div>
+      <hr class="pv-divider">
+      <h4>2 · The password</h4>
+      <div class="pv-row">
+        <div class="field"><label>New password for this page</label><input type="password" id="pv-password" autocomplete="new-password" placeholder="At least 6 characters"></div>
+        <button class="btn btn-primary" id="pv-set-password" style="margin-bottom:6px;">Set password</button>
+      </div>
+      <div class="pv-hint">Share it only with the people who should see this page. They open the same site address and type it on the usual sign-in screen — they will see <b>only</b> this page, never the tracker. The password is stored scrambled, so it can’t be shown again; to change it, just set a new one. It has to be different from the admin passphrase and every employee passcode.</div>
+      <hr class="pv-divider">
+      <button class="btn btn-danger" id="pv-remove">Remove page and password</button>
+    </div>
+    <div class="pv-frame-wrap" id="pv-frame-wrap">
+      <button class="btn pv-exit" id="pv-exit">✕ Exit full screen</button>
+      <iframe id="pv-frame" title="Private page preview" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals" style="display:none;"></iframe>
+      <div class="pv-empty" id="pv-empty">Loading…</div>
+    </div>
   </section>
 
   <!-- PROJECT DETAIL (drill-down, not a tab — reached by clicking a project card) -->
@@ -1593,6 +1656,15 @@
   </div>
 </div>
 
+<!-- Page-only screen: shown instead of the whole app when someone signs in with the private page's password -->
+<div id="pageonly-shell">
+  <div class="po-bar"><span class="po-name" id="po-title">Private page</span><button class="btn" id="po-lock">🔒 Lock</button></div>
+  <div class="po-body">
+    <iframe id="po-frame" title="Private page" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals" style="display:none;"></iframe>
+    <div class="po-empty" id="po-empty">This page has no content yet.</div>
+  </div>
+</div>
+
 <!-- Passphrase gate — blocks the dashboard until a valid member/admin passphrase is entered.
      Enforced again server-side in Code.gs, so this screen alone isn't the real security
      boundary — it's just the UI half of it. -->
@@ -1651,6 +1723,7 @@
         projects: json.projects || [], sprints: json.sprints || [], steps: json.steps || [],
         competitions: json.competitions || [],
         competitionRecipients: json.competitionRecipients || [],
+        privatePage: json.privatePage || null,
         cachedAt: Date.now()
       }));
     }catch(e){ /* storage full/unavailable — fine, this is just a best-effort cache */ }
@@ -1892,6 +1965,7 @@
     var hid = hiddenNameSet_();
     state.competitions = (json.competitions || []).filter(function(c){ return c.received || !hid[normName(c.ownerName)]; });
     state.compRecipients = json.competitionRecipients || [];
+    state.privatePage = json.privatePage || null;
   }
 
   function fetchTasks(){
@@ -1902,6 +1976,7 @@
     }
     return fetch(apiUrlWithKey(), {headers: apiHeaders()}).then(function(r){return r.json();}).then(function(json){
       if(json.ok){
+        if(json.role === 'page'){ enterPageMode_(json); return; }
         state.role = json.role || state.role;
         state.myName = json.studentName || '';
         applyBundle_(json);
@@ -1955,6 +2030,11 @@
   function updateRoleUI(){
     var pill = document.getElementById('role-pill');
     var lockBtn = document.getElementById('btn-lock');
+    // The private-page tab is admin-only (and only once the backend reported it).
+    var pvTab = document.getElementById('tab-private'), showPv = !SAMPLE && state.role === 'admin' && !!state.privatePage;
+    pvTab.style.display = showPv ? '' : 'none';
+    if(showPv) pvTab.textContent = state.privatePage.title || 'Private page';
+    if(!showPv && state.view === 'private') switchView('overview');
     if(!CONFIG.API_URL || !state.role){
       pill.style.display = 'none';
       lockBtn.style.display = 'none';
@@ -1982,6 +2062,8 @@
     try{ localStorage.removeItem(keyStorageName()); }catch(e){}
     try{ localStorage.removeItem(dataCacheStorageName()); }catch(e){}
     state.tasks = []; state.students = []; state.projects = []; state.sprints = []; state.steps = []; state.competitions = []; state.compRecipients = [];
+    state.privatePage = null; pvLoaded = false; pvHtml = '';
+    leavePageMode_();
     updateRoleUI();
     renderAll();
     showGate();
@@ -1996,6 +2078,13 @@
     fetch(apiUrlWithKey(), {headers: apiHeaders()}).then(function(r){return r.json();}).then(function(json){
       submitBtn.disabled = false;
       if(json && json.ok){
+        // A private-page password opens that one page and nothing else — no tracker at all.
+        if(json.role === 'page'){
+          try{ localStorage.setItem(keyStorageName(), key); }catch(e){}
+          enterPageMode_(json);
+          return;
+        }
+        leavePageMode_();
         state.role = json.role;
         state.myName = json.studentName || '';
         applyBundle_(json);
@@ -2024,6 +2113,7 @@
     CONFIG.KEY = key;
     fetch(apiUrlWithKey(), {headers: apiHeaders()}).then(function(r){return r.json();}).then(function(json){
       if(json && json.ok){
+        if(json.role === 'page'){ enterPageMode_(json); return; }
         state.role = json.role || state.role;
         state.myName = json.studentName || '';
         applyBundle_(json);
@@ -2102,6 +2192,7 @@
     if(state.view === 'student') safeRender(renderStudentDetail);
     safeRender(renderProjectsTab);
     safeRender(renderCompetitionsTab);
+    safeRender(renderPrivateTab_);
     if(state.view === 'project-detail') safeRender(renderProjectDetail);
   }
 
@@ -5045,6 +5136,127 @@
     });
   }
 
+
+  /* ---------- Private page ----------
+     One standalone HTML page, stored in the database and only sent to someone who knows its password.
+     - Anyone who signs in with that password sees ONLY the page (enterPageMode_): no tabs, no tracker data.
+     - The admin gets a tab with the same page plus settings (upload the HTML, set the password).
+     The HTML is shown in a sandboxed iframe WITHOUT allow-same-origin, so whatever scripts are in the page
+     run in an isolated, empty origin and can never read the tracker's stored passphrase or data. */
+  var PAGE_SANDBOX = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals';
+  var pvLoaded = false, pvHtml = '', pvPickedHtml = null, pvSettingsAutoOpened = false;
+  var ORIGINAL_TITLE = document.title;
+
+  function metaFrom_(res){
+    return { setup: res.setup !== false, title: res.title || 'Private page', hasHtml: !!res.hasHtml, hasPassword: !!res.hasPassword, updatedAt: res.updatedAt || '' };
+  }
+  function fillFrame_(frame, emptyEl, html, emptyText){
+    frame.setAttribute('sandbox', PAGE_SANDBOX);
+    if(html){
+      emptyEl.style.display = 'none'; frame.style.display = '';
+      if(frame.__html !== html){ frame.srcdoc = html; frame.__html = html; }   // don't reload the page on every background refresh
+    } else {
+      frame.style.display = 'none'; frame.__html = ''; frame.srcdoc = '';
+      emptyEl.style.display = ''; emptyEl.textContent = emptyText;
+    }
+  }
+  function enterPageMode_(json){
+    state.role = 'page'; state.myName = '';
+    try{ localStorage.removeItem(dataCacheStorageName()); }catch(e){}   // never keep tracker data around for this sign-in
+    document.body.classList.add('page-only');
+    hideGate(); showGateError('');
+    var title = json.title || 'Private page';
+    document.getElementById('po-title').textContent = title;
+    document.title = title;
+    fillFrame_(document.getElementById('po-frame'), document.getElementById('po-empty'), json.html || '', 'This page has no content yet.');
+  }
+  function leavePageMode_(){
+    if(!document.body.classList.contains('page-only')) return;
+    document.body.classList.remove('page-only');
+    var f = document.getElementById('po-frame'); f.srcdoc = ''; f.__html = '';
+    document.title = ORIGINAL_TITLE;
+  }
+  document.getElementById('po-lock').addEventListener('click', function(){ lockOut(''); });
+
+  /* ----- admin tab ----- */
+  function pvChip_(ok, yes, no){ return '<span class="pv-chip '+(ok ? 'ok' : 'bad')+'">'+esc(ok ? yes : no)+'</span>'; }
+  function renderPrivateTab_(){
+    var m = state.privatePage; if(!m || !document.getElementById('view-private')) return;
+    document.getElementById('pv-title').textContent = m.title || 'Private page';
+    var ti = document.getElementById('pv-title-input'); if(document.activeElement !== ti) ti.value = m.title || '';
+    document.getElementById('pv-status').innerHTML = pvChip_(m.hasHtml, 'Page uploaded', 'No page uploaded yet') +
+      pvChip_(m.hasPassword, 'Password set', 'No password set — nobody can open it yet') +
+      (m.hasHtml && m.hasPassword ? '<span class="pv-chip ok">Live — people with the password see only this page</span>' : '');
+    document.getElementById('pv-setup-warning').style.display = m.setup ? 'none' : '';
+    if(!pvSettingsAutoOpened && (!m.setup || !m.hasHtml || !m.hasPassword)){
+      pvSettingsAutoOpened = true; document.getElementById('pv-settings').style.display = '';
+    }
+  }
+  function showPvFrame_(){
+    fillFrame_(document.getElementById('pv-frame'), document.getElementById('pv-empty'), pvHtml,
+      'No page uploaded yet — open “Page settings” and choose an HTML file.');
+  }
+  function loadPrivatePage_(force){
+    if(!state.privatePage || SAMPLE) return;
+    if(pvLoaded && !force){ return; }
+    apiCall('getPrivatePage', {}).then(function(res){
+      if(!res || res.ok === false){ var e = document.getElementById('pv-empty'); e.style.display = ''; e.textContent = 'Could not load the page. ' + errText_(res); return; }
+      pvLoaded = true; pvHtml = res.html || ''; state.privatePage = metaFrom_(res);
+      showPvFrame_(); renderPrivateTab_(); updateRoleUI();
+    }).catch(function(){ var e = document.getElementById('pv-empty'); e.style.display = ''; e.textContent = 'Could not reach the server.'; });
+  }
+  document.getElementById('tab-private').addEventListener('click', function(){ renderPrivateTab_(); loadPrivatePage_(false); });
+  document.getElementById('pv-settings-toggle').addEventListener('click', function(){
+    var el = document.getElementById('pv-settings'); el.style.display = el.style.display === 'none' ? '' : 'none';
+  });
+  document.getElementById('pv-file').addEventListener('change', function(e){
+    var f = e.target.files && e.target.files[0], note = document.getElementById('pv-file-note');
+    pvPickedHtml = null; if(!f) return;
+    if(f.size > 4000000){ note.textContent = 'That file is over 4 MB — shrink embedded images or fonts and try again.'; e.target.value = ''; return; }
+    var rd = new FileReader();
+    rd.onerror = function(){ note.textContent = 'Could not read that file.'; };
+    rd.onload = function(){ pvPickedHtml = String(rd.result || ''); note.textContent = 'Selected: ' + f.name + ' (' + Math.max(1, Math.round(f.size/1024)) + ' KB) — press “Save page” to publish it.'; };
+    rd.readAsText(f);
+  });
+  document.getElementById('pv-save').addEventListener('click', function(){
+    var btn = this, data = { title: document.getElementById('pv-title-input').value.trim() };
+    if(pvPickedHtml !== null) data.html = pvPickedHtml;
+    btn.disabled = true;
+    apiCall('savePrivatePage', {data:data}).then(function(res){
+      btn.disabled = false;
+      if(!res || res.ok === false){ showToast('Not saved. ' + errText_(res)); return; }
+      state.privatePage = metaFrom_(res);
+      if(data.html !== undefined){ pvHtml = data.html; pvLoaded = true; showPvFrame_(); }
+      pvPickedHtml = null; document.getElementById('pv-file').value = '';
+      document.getElementById('pv-file-note').textContent = 'Saved. Choose another .html file any time to replace the page.';
+      renderPrivateTab_(); updateRoleUI(); showToast('Saved.');
+    }).catch(function(){ btn.disabled = false; showToast('Not saved — could not reach the server.'); });
+  });
+  document.getElementById('pv-set-password').addEventListener('click', function(){
+    var btn = this, inp = document.getElementById('pv-password'), pw = inp.value.trim();
+    if(pw.length < 6){ showToast('Use at least 6 characters for the password.'); return; }
+    btn.disabled = true;
+    apiCall('setPrivatePagePassword', {password:pw}).then(function(res){
+      btn.disabled = false;
+      if(!res || res.ok === false){ showToast('Password not changed. ' + errText_(res)); return; }
+      inp.value = ''; state.privatePage = metaFrom_(res); renderPrivateTab_();
+      showToast('Password saved — share it with the people who should see this page.');
+    }).catch(function(){ btn.disabled = false; showToast('Password not changed — could not reach the server.'); });
+  });
+  document.getElementById('pv-remove').addEventListener('click', function(){
+    if(!confirm('Remove the private page and its password?\n\nThe page content is deleted and nobody can open it any more until you upload a page and set a password again.')) return;
+    apiCall('deletePrivatePage', {}).then(function(res){
+      if(!res || res.ok === false){ showToast('Not removed. ' + errText_(res)); return; }
+      state.privatePage = metaFrom_(res); pvHtml = ''; pvLoaded = true; showPvFrame_(); renderPrivateTab_(); updateRoleUI(); showToast('Removed.');
+    }).catch(function(){ showToast('Not removed — could not reach the server.'); });
+  });
+  function setPvFull_(on){
+    document.getElementById('pv-frame-wrap').classList.toggle('is-full', !!on);
+    document.body.style.overflow = on ? 'hidden' : '';
+  }
+  document.getElementById('pv-full').addEventListener('click', function(){ setPvFull_(true); });
+  document.getElementById('pv-exit').addEventListener('click', function(){ setPvFull_(false); });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && document.getElementById('pv-frame-wrap').classList.contains('is-full')) setPvFull_(false); });
 
   /* ---------- Competitions ----------
      Each employee keeps their own competitions (the server only sends a member their own; admin
