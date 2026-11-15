@@ -1190,7 +1190,7 @@
         <div class="field"><label>HTML file</label><input type="file" id="pv-file" accept=".html,.htm,text/html"></div>
         <button class="btn btn-primary" id="pv-save" style="margin-bottom:6px;">Save page</button>
       </div>
-      <div class="pv-hint" id="pv-file-note">Choose a self-contained .html file (images and styles embedded, or loaded from the internet). Saving replaces the current page. Up to about 4 MB.</div>
+      <div class="pv-hint" id="pv-file-note">Choose a self-contained .html file (images and styles embedded, or loaded from the internet), up to 50 MB. Saving replaces the current page. Large files upload straight to your database storage and can take a minute or two.</div>
       <hr class="pv-divider">
       <h4>2 · The password</h4>
       <div class="pv-row">
@@ -2062,7 +2062,7 @@
     try{ localStorage.removeItem(keyStorageName()); }catch(e){}
     try{ localStorage.removeItem(dataCacheStorageName()); }catch(e){}
     state.tasks = []; state.students = []; state.projects = []; state.sprints = []; state.steps = []; state.competitions = []; state.compRecipients = [];
-    state.privatePage = null; pvLoaded = false; pvHtml = '';
+    state.privatePage = null; resetPrivateAdmin_();
     leavePageMode_();
     updateRoleUI();
     renderAll();
@@ -5138,28 +5138,76 @@
 
 
   /* ---------- Private page ----------
-     One standalone HTML page, stored in the database and only sent to someone who knows its password.
+     One standalone HTML page (up to 50 MB), stored in a private Supabase Storage bucket and only made
+     available to someone who knows its password.
      - Anyone who signs in with that password sees ONLY the page (enterPageMode_): no tabs, no tracker data.
      - The admin gets a tab with the same page plus settings (upload the HTML, set the password).
-     The HTML is shown in a sandboxed iframe WITHOUT allow-same-origin, so whatever scripts are in the page
-     run in an isolated, empty origin and can never read the tracker's stored passphrase or data. */
+     The file never goes through the tracker function: the admin's browser uploads it straight to Storage
+     (a one-time signed link from the function) and everyone else's browser downloads it straight from
+     Storage (a 10-minute signed link from the function, given only after the password is checked).
+     The HTML is shown in a sandboxed iframe WITHOUT allow-same-origin, so scripts inside the page run in an
+     isolated, empty origin and can never read the tracker's stored passphrase or data. */
   var PAGE_SANDBOX = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals';
-  var pvLoaded = false, pvHtml = '', pvPickedHtml = null, pvSettingsAutoOpened = false;
+  var MAX_PAGE_BYTES = 50000000;
+  var pvLoaded = false, pvPickedFile = null, pvSettingsAutoOpened = false, pvLoadSeq = 0, poLoadSeq = 0;
   var ORIGINAL_TITLE = document.title;
 
+  function fmtMB_(bytes){ return (bytes / 1000000).toFixed(bytes >= 10000000 ? 0 : 1) + ' MB'; }
   function metaFrom_(res){
-    return { setup: res.setup !== false, title: res.title || 'Private page', hasHtml: !!res.hasHtml, hasPassword: !!res.hasPassword, updatedAt: res.updatedAt || '' };
+    return { setup: res.setup !== false, title: res.title || 'Private page', hasHtml: !!res.hasHtml, hasPassword: !!res.hasPassword,
+      sizeBytes: Number(res.sizeBytes) || 0, updatedAt: res.updatedAt || '' };
   }
-  function fillFrame_(frame, emptyEl, html, emptyText){
+  /** Stops showing whatever a frame had (and frees the memory of a downloaded page). */
+  function releaseFrame_(frame){
+    if(frame.__blob){ try{ URL.revokeObjectURL(frame.__blob); }catch(e){} }
+    frame.__blob = ''; frame.__key = '';
+    frame.removeAttribute('src'); frame.removeAttribute('srcdoc');
+  }
+  /** content = {key, blobUrl} or {key, html}; null shows the empty message instead. */
+  function setFrameContent_(frame, emptyEl, content, emptyText){
     frame.setAttribute('sandbox', PAGE_SANDBOX);
-    if(html){
+    if(content){
       emptyEl.style.display = 'none'; frame.style.display = '';
-      if(frame.__html !== html){ frame.srcdoc = html; frame.__html = html; }   // don't reload the page on every background refresh
+      if(frame.__key !== content.key){            // don't reload a page that has not changed
+        releaseFrame_(frame);
+        if(content.blobUrl){ frame.src = content.blobUrl; frame.__blob = content.blobUrl; } else { frame.srcdoc = content.html; }
+        frame.__key = content.key;
+      }
     } else {
-      frame.style.display = 'none'; frame.__html = ''; frame.srcdoc = '';
+      releaseFrame_(frame); frame.style.display = 'none';
       emptyEl.style.display = ''; emptyEl.textContent = emptyText;
     }
   }
+  /** Downloads the page straight from Storage, reporting progress, and returns a blob: URL for the frame. */
+  function downloadPage_(url, onProgress){
+    return fetch(url).then(function(r){
+      if(!r.ok) throw new Error('The page could not be downloaded (error ' + r.status + ').');
+      var total = Number(r.headers.get('content-length')) || 0;
+      if(!r.body || !r.body.getReader) return r.blob().then(function(b){ return URL.createObjectURL(new Blob([b], {type:'text/html;charset=utf-8'})); });
+      var reader = r.body.getReader(), chunks = [], got = 0;
+      function pump(){
+        return reader.read().then(function(x){
+          if(x.done) return;
+          chunks.push(x.value); got += x.value.length; onProgress(got, total);
+          return pump();
+        });
+      }
+      return pump().then(function(){ return URL.createObjectURL(new Blob(chunks, {type:'text/html;charset=utf-8'})); });
+    });
+  }
+  /** Turns the server's answer into something a frame can show (downloading it if it is a link). */
+  function resolvePageContent_(res, emptyEl){
+    if(res.url){
+      emptyEl.style.display = ''; emptyEl.textContent = 'Loading the page…';
+      return downloadPage_(res.url, function(got, total){
+        emptyEl.textContent = 'Loading the page… ' + fmtMB_(got) + (total ? ' of ' + fmtMB_(total) : '');
+      }).then(function(blobUrl){ return { key: res.version, blobUrl: blobUrl }; });
+    }
+    if(res.html) return Promise.resolve({ key: res.version, html: res.html });
+    return Promise.resolve(null);
+  }
+
+  /* ----- visitor with the page password ----- */
   function enterPageMode_(json){
     state.role = 'page'; state.myName = '';
     try{ localStorage.removeItem(dataCacheStorageName()); }catch(e){}   // never keep tracker data around for this sign-in
@@ -5168,13 +5216,28 @@
     var title = json.title || 'Private page';
     document.getElementById('po-title').textContent = title;
     document.title = title;
-    fillFrame_(document.getElementById('po-frame'), document.getElementById('po-empty'), json.html || '', 'This page has no content yet.');
+    var frame = document.getElementById('po-frame'), empty = document.getElementById('po-empty');
+    if(frame.__key && frame.__key === json.version) return;               // already showing this version
+    var seq = ++poLoadSeq;
+    resolvePageContent_(json, empty).then(function(content){
+      if(seq !== poLoadSeq || state.role !== 'page') return;               // signed out / superseded meanwhile
+      setFrameContent_(frame, empty, content, 'This page has no content yet.');
+    }).catch(function(err){
+      if(seq !== poLoadSeq) return;
+      releaseFrame_(frame); frame.style.display = 'none'; empty.style.display = '';
+      empty.textContent = 'Could not load the page. ' + (err && err.message ? err.message : '') + ' Reload this screen to try again.';
+    });
   }
   function leavePageMode_(){
+    poLoadSeq++;
     if(!document.body.classList.contains('page-only')) return;
     document.body.classList.remove('page-only');
-    var f = document.getElementById('po-frame'); f.srcdoc = ''; f.__html = '';
+    releaseFrame_(document.getElementById('po-frame'));
     document.title = ORIGINAL_TITLE;
+  }
+  function resetPrivateAdmin_(){
+    pvLoaded = false; pvPickedFile = null; pvLoadSeq++;
+    releaseFrame_(document.getElementById('pv-frame'));
   }
   document.getElementById('po-lock').addEventListener('click', function(){ lockOut(''); });
 
@@ -5184,7 +5247,8 @@
     var m = state.privatePage; if(!m || !document.getElementById('view-private')) return;
     document.getElementById('pv-title').textContent = m.title || 'Private page';
     var ti = document.getElementById('pv-title-input'); if(document.activeElement !== ti) ti.value = m.title || '';
-    document.getElementById('pv-status').innerHTML = pvChip_(m.hasHtml, 'Page uploaded', 'No page uploaded yet') +
+    document.getElementById('pv-status').innerHTML =
+      pvChip_(m.hasHtml, 'Page uploaded' + (m.sizeBytes ? ' (' + fmtMB_(m.sizeBytes) + ')' : ''), 'No page uploaded yet') +
       pvChip_(m.hasPassword, 'Password set', 'No password set — nobody can open it yet') +
       (m.hasHtml && m.hasPassword ? '<span class="pv-chip ok">Live — people with the password see only this page</span>' : '');
     document.getElementById('pv-setup-warning').style.display = m.setup ? 'none' : '';
@@ -5192,18 +5256,23 @@
       pvSettingsAutoOpened = true; document.getElementById('pv-settings').style.display = '';
     }
   }
-  function showPvFrame_(){
-    fillFrame_(document.getElementById('pv-frame'), document.getElementById('pv-empty'), pvHtml,
-      'No page uploaded yet — open “Page settings” and choose an HTML file.');
-  }
   function loadPrivatePage_(force){
     if(!state.privatePage || SAMPLE) return;
-    if(pvLoaded && !force){ return; }
+    if(pvLoaded && !force) return;
+    var frame = document.getElementById('pv-frame'), empty = document.getElementById('pv-empty'), seq = ++pvLoadSeq;
     apiCall('getPrivatePage', {}).then(function(res){
-      if(!res || res.ok === false){ var e = document.getElementById('pv-empty'); e.style.display = ''; e.textContent = 'Could not load the page. ' + errText_(res); return; }
-      pvLoaded = true; pvHtml = res.html || ''; state.privatePage = metaFrom_(res);
-      showPvFrame_(); renderPrivateTab_(); updateRoleUI();
-    }).catch(function(){ var e = document.getElementById('pv-empty'); e.style.display = ''; e.textContent = 'Could not reach the server.'; });
+      if(!res || res.ok === false){ throw new Error(errText_(res)); }
+      state.privatePage = metaFrom_(res); renderPrivateTab_(); updateRoleUI();
+      return resolvePageContent_(res, empty);
+    }).then(function(content){
+      if(seq !== pvLoadSeq) return;
+      pvLoaded = true;
+      setFrameContent_(frame, empty, content, 'No page uploaded yet — open “Page settings” and choose an HTML file.');
+    }).catch(function(err){
+      if(seq !== pvLoadSeq) return;
+      releaseFrame_(frame); frame.style.display = 'none'; empty.style.display = '';
+      empty.textContent = 'Could not load the page. ' + (err && err.message ? err.message : '');
+    });
   }
   document.getElementById('tab-private').addEventListener('click', function(){ renderPrivateTab_(); loadPrivatePage_(false); });
   document.getElementById('pv-settings-toggle').addEventListener('click', function(){
@@ -5211,26 +5280,70 @@
   });
   document.getElementById('pv-file').addEventListener('change', function(e){
     var f = e.target.files && e.target.files[0], note = document.getElementById('pv-file-note');
-    pvPickedHtml = null; if(!f) return;
-    if(f.size > 4000000){ note.textContent = 'That file is over 4 MB — shrink embedded images or fonts and try again.'; e.target.value = ''; return; }
-    var rd = new FileReader();
-    rd.onerror = function(){ note.textContent = 'Could not read that file.'; };
-    rd.onload = function(){ pvPickedHtml = String(rd.result || ''); note.textContent = 'Selected: ' + f.name + ' (' + Math.max(1, Math.round(f.size/1024)) + ' KB) — press “Save page” to publish it.'; };
-    rd.readAsText(f);
+    pvPickedFile = null; if(!f) return;
+    if(f.size > MAX_PAGE_BYTES){ note.textContent = 'That file is ' + fmtMB_(f.size) + ' — the limit is 50 MB. Shrink embedded images or video and try again.'; e.target.value = ''; return; }
+    if(f.size === 0){ note.textContent = 'That file is empty.'; e.target.value = ''; return; }
+    pvPickedFile = f;
+    note.textContent = 'Selected: ' + f.name + ' (' + fmtMB_(f.size) + ') — press “Save page” to publish it.';
   });
+  /** Sends the file straight to Storage with the one-time signed link (same request Supabase's own library makes),
+   *  reporting progress. Only the public "apikey" header is sent — the one-time token in the URL is the authorisation. */
+  function putToStorage_(prep, file, onProgress){
+    return new Promise(function(resolve, reject){
+      var url = new URL(CONFIG.API_URL).origin + '/storage/v1/object/upload/sign/' + encodeURIComponent(prep.bucket) + '/' + encodeURIComponent(prep.path) +
+        '?token=' + encodeURIComponent(prep.token);
+      var form = new FormData(); form.append('cacheControl', '3600'); form.append('', file);
+      var xhr = new XMLHttpRequest();
+      xhr.open('PUT', url);
+      xhr.setRequestHeader('apikey', SUPABASE_ANON_KEY);
+      xhr.setRequestHeader('x-upsert', 'false');
+      xhr.upload.onprogress = function(e){ if(e.lengthComputable) onProgress(e.loaded, e.total); };
+      xhr.onerror = function(){ reject(new Error('The upload was interrupted — check your connection and try again.')); };
+      xhr.onload = function(){
+        if(xhr.status >= 200 && xhr.status < 300){ resolve(); return; }
+        var msg = ''; try{ var j = JSON.parse(xhr.responseText); msg = j.message || j.error || ''; }catch(e){}
+        reject(new Error('The upload was refused' + (msg ? ': ' + msg : ' (error ' + xhr.status + ')') + '.'));
+      };
+      xhr.send(form);
+    });
+  }
+  /** Upload straight to Storage: ask the function for a one-time link, send the file, tell the function it arrived. */
+  function uploadPrivatePage_(file, title, note){
+    var prep;
+    note.textContent = 'Preparing the upload…';
+    return apiCall('preparePrivatePageUpload', {}).then(function(res){
+      if(!res || res.ok === false) throw new Error(errText_(res));
+      prep = res;
+      return putToStorage_(prep, file, function(done, total){
+        note.textContent = 'Uploading ' + file.name + '… ' + fmtMB_(done) + ' of ' + fmtMB_(total) + ' (' + Math.round(done / total * 100) + '%). Keep this page open.';
+      });
+    }).then(function(){
+      note.textContent = 'Finishing…';
+      return apiCall('finishPrivatePageUpload', { path: prep.path, title: title });
+    }).then(function(res){
+      if(!res || res.ok === false) throw new Error(errText_(res));
+      return res;
+    });
+  }
   document.getElementById('pv-save').addEventListener('click', function(){
-    var btn = this, data = { title: document.getElementById('pv-title-input').value.trim() };
-    if(pvPickedHtml !== null) data.html = pvPickedHtml;
+    var btn = this, title = document.getElementById('pv-title-input').value.trim(), note = document.getElementById('pv-file-note');
     btn.disabled = true;
-    apiCall('savePrivatePage', {data:data}).then(function(res){
+    var job = pvPickedFile
+      ? uploadPrivatePage_(pvPickedFile, title, note)
+      : apiCall('savePrivatePage', { data: { title: title } }).then(function(res){ if(!res || res.ok === false) throw new Error(errText_(res)); return res; });
+    var uploaded = !!pvPickedFile;
+    job.then(function(res){
       btn.disabled = false;
-      if(!res || res.ok === false){ showToast('Not saved. ' + errText_(res)); return; }
       state.privatePage = metaFrom_(res);
-      if(data.html !== undefined){ pvHtml = data.html; pvLoaded = true; showPvFrame_(); }
-      pvPickedHtml = null; document.getElementById('pv-file').value = '';
-      document.getElementById('pv-file-note').textContent = 'Saved. Choose another .html file any time to replace the page.';
+      pvPickedFile = null; document.getElementById('pv-file').value = '';
+      note.textContent = 'Saved. Choose another .html file any time to replace the page.';
       renderPrivateTab_(); updateRoleUI(); showToast('Saved.');
-    }).catch(function(){ btn.disabled = false; showToast('Not saved — could not reach the server.'); });
+      if(uploaded) loadPrivatePage_(true);
+    }).catch(function(err){
+      btn.disabled = false;
+      note.textContent = 'Not saved. ' + (err && err.message ? err.message : 'Something went wrong.');
+      showToast('Not saved. ' + (err && err.message ? err.message : ''));
+    });
   });
   document.getElementById('pv-set-password').addEventListener('click', function(){
     var btn = this, inp = document.getElementById('pv-password'), pw = inp.value.trim();
@@ -5247,7 +5360,9 @@
     if(!confirm('Remove the private page and its password?\n\nThe page content is deleted and nobody can open it any more until you upload a page and set a password again.')) return;
     apiCall('deletePrivatePage', {}).then(function(res){
       if(!res || res.ok === false){ showToast('Not removed. ' + errText_(res)); return; }
-      state.privatePage = metaFrom_(res); pvHtml = ''; pvLoaded = true; showPvFrame_(); renderPrivateTab_(); updateRoleUI(); showToast('Removed.');
+      state.privatePage = metaFrom_(res); pvLoadSeq++; pvLoaded = true;
+      setFrameContent_(document.getElementById('pv-frame'), document.getElementById('pv-empty'), null, 'No page uploaded yet — open “Page settings” and choose an HTML file.');
+      renderPrivateTab_(); updateRoleUI(); showToast('Removed.');
     }).catch(function(){ showToast('Not removed — could not reach the server.'); });
   });
   function setPvFull_(on){
