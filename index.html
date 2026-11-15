@@ -1184,15 +1184,20 @@
     <div class="pv-status" id="pv-status"></div>
     <div class="pv-settings" id="pv-settings" style="display:none;">
       <div class="muted" id="pv-setup-warning" style="display:none;margin-bottom:12px;color:var(--stc-coral,#ff375e);font-weight:600;">The database table for this page does not exist yet — run <code>add-private-page.sql</code> in Supabase first.</div>
-      <h4>1 · The page</h4>
+      <h4>1 · The file</h4>
+      <div class="pv-row">
+        <div class="field"><label>HTML file</label><input type="file" id="pv-file" accept=".html,.htm,text/html"></div>
+        <button class="btn btn-primary" id="pv-upload" style="margin-bottom:6px;">Upload file</button>
+      </div>
+      <div class="pv-hint" id="pv-file-note">Choose a self-contained .html file (images and styles embedded, or loaded from the internet), up to 50 MB. Replacing the file changes <b>only</b> the page’s content — the name and the password stay exactly as they are. The current page stays live until the new file has fully uploaded; people who already have it open see the new version the next time they open or reload it. Large files can take a minute or two.</div>
+      <hr class="pv-divider">
+      <h4>2 · The name</h4>
       <div class="pv-row">
         <div class="field"><label>Name (also the tab name)</label><input type="text" id="pv-title-input" maxlength="60" placeholder="Private page"></div>
-        <div class="field"><label>HTML file</label><input type="file" id="pv-file" accept=".html,.htm,text/html"></div>
-        <button class="btn btn-primary" id="pv-save" style="margin-bottom:6px;">Save page</button>
+        <button class="btn" id="pv-save-title" style="margin-bottom:6px;">Save name</button>
       </div>
-      <div class="pv-hint" id="pv-file-note">Choose a self-contained .html file (images and styles embedded, or loaded from the internet), up to 50 MB. Saving replaces the current page. Large files upload straight to your database storage and can take a minute or two.</div>
       <hr class="pv-divider">
-      <h4>2 · The password</h4>
+      <h4>3 · The password</h4>
       <div class="pv-row">
         <div class="field"><label>New password for this page</label><input type="password" id="pv-password" autocomplete="new-password" placeholder="At least 6 characters"></div>
         <button class="btn btn-primary" id="pv-set-password" style="margin-bottom:6px;">Set password</button>
@@ -5251,6 +5256,7 @@
       pvChip_(m.hasHtml, 'Page uploaded' + (m.sizeBytes ? ' (' + fmtMB_(m.sizeBytes) + ')' : ''), 'No page uploaded yet') +
       pvChip_(m.hasPassword, 'Password set', 'No password set — nobody can open it yet') +
       (m.hasHtml && m.hasPassword ? '<span class="pv-chip ok">Live — people with the password see only this page</span>' : '');
+    document.getElementById('pv-upload').textContent = m.hasHtml ? 'Replace file' : 'Upload file';
     document.getElementById('pv-setup-warning').style.display = m.setup ? 'none' : '';
     if(!pvSettingsAutoOpened && (!m.setup || !m.hasHtml || !m.hasPassword)){
       pvSettingsAutoOpened = true; document.getElementById('pv-settings').style.display = '';
@@ -5284,7 +5290,7 @@
     if(f.size > MAX_PAGE_BYTES){ note.textContent = 'That file is ' + fmtMB_(f.size) + ' — the limit is 50 MB. Shrink embedded images or video and try again.'; e.target.value = ''; return; }
     if(f.size === 0){ note.textContent = 'That file is empty.'; e.target.value = ''; return; }
     pvPickedFile = f;
-    note.textContent = 'Selected: ' + f.name + ' (' + fmtMB_(f.size) + ') — press “Save page” to publish it.';
+    note.textContent = 'Selected: ' + f.name + ' (' + fmtMB_(f.size) + ') — press “' + (state.privatePage && state.privatePage.hasHtml ? 'Replace file' : 'Upload file') + '” to publish it.';
   });
   /** Sends the file straight to Storage with the one-time signed link (same request Supabase's own library makes),
    *  reporting progress. Only the public "apikey" header is sent — the one-time token in the URL is the authorisation. */
@@ -5325,25 +5331,33 @@
       return res;
     });
   }
-  document.getElementById('pv-save').addEventListener('click', function(){
-    var btn = this, title = document.getElementById('pv-title-input').value.trim(), note = document.getElementById('pv-file-note');
-    btn.disabled = true;
-    var job = pvPickedFile
-      ? uploadPrivatePage_(pvPickedFile, title, note)
-      : apiCall('savePrivatePage', { data: { title: title } }).then(function(res){ if(!res || res.ok === false) throw new Error(errText_(res)); return res; });
-    var uploaded = !!pvPickedFile;
-    job.then(function(res){
+  /** Replace (or first-time upload of) the file. Sends ONLY the file: the name and password are never touched. */
+  document.getElementById('pv-upload').addEventListener('click', function(){
+    var btn = this, note = document.getElementById('pv-file-note');
+    if(!pvPickedFile){ showToast('Choose an HTML file first.'); return; }
+    var file = pvPickedFile; btn.disabled = true;
+    uploadPrivatePage_(file, undefined, note).then(function(res){
       btn.disabled = false;
       state.privatePage = metaFrom_(res);
       pvPickedFile = null; document.getElementById('pv-file').value = '';
-      note.textContent = 'Saved. Choose another .html file any time to replace the page.';
-      renderPrivateTab_(); updateRoleUI(); showToast('Saved.');
-      if(uploaded) loadPrivatePage_(true);
+      note.textContent = 'Done — the file was replaced (' + fmtMB_(res.sizeBytes || file.size) + '). The name and password were not changed.';
+      renderPrivateTab_(); updateRoleUI(); showToast('File replaced.');
+      loadPrivatePage_(true);
     }).catch(function(err){
       btn.disabled = false;
-      note.textContent = 'Not saved. ' + (err && err.message ? err.message : 'Something went wrong.');
-      showToast('Not saved. ' + (err && err.message ? err.message : ''));
+      note.textContent = 'Not uploaded — the page that was live is unchanged. ' + (err && err.message ? err.message : 'Something went wrong.');
+      showToast('Not uploaded. ' + (err && err.message ? err.message : ''));
     });
+  });
+  document.getElementById('pv-save-title').addEventListener('click', function(){
+    var btn = this, title = document.getElementById('pv-title-input').value.trim();
+    if(!title){ showToast('Enter a name for the page.'); return; }
+    btn.disabled = true;
+    apiCall('savePrivatePage', { data: { title: title } }).then(function(res){
+      btn.disabled = false;
+      if(!res || res.ok === false){ showToast('Name not saved. ' + errText_(res)); return; }
+      state.privatePage = metaFrom_(res); renderPrivateTab_(); updateRoleUI(); showToast('Name saved.');
+    }).catch(function(){ btn.disabled = false; showToast('Name not saved — could not reach the server.'); });
   });
   document.getElementById('pv-set-password').addEventListener('click', function(){
     var btn = this, inp = document.getElementById('pv-password'), pw = inp.value.trim();
