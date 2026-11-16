@@ -500,6 +500,16 @@
   .pv-divider{border:none;border-top:1px solid var(--gridline);margin:14px 0;}
   .pv-frame-wrap{position:relative;height:calc(100vh - 300px);min-height:460px;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;}
   .pv-frame-wrap.is-full{position:fixed;inset:0;z-index:80;height:auto;border:0;border-radius:0;}
+  .pv-list{display:flex;flex-direction:column;gap:10px;}
+  .pv-item{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;width:100%;text-align:left;padding:14px 16px;border:1px solid var(--border);border-radius:14px;background:var(--surface-1);cursor:pointer;font:inherit;color:inherit;transition:border-color .15s, box-shadow .15s;}
+  .pv-item:hover, .pv-item:focus-visible{border-color:var(--series-1);box-shadow:0 2px 10px color-mix(in srgb, var(--series-1) 14%, transparent);outline:none;}
+  .pv-item .pv-name{font-weight:700;font-size:14.5px;color:var(--text-primary);}
+  .pv-item .pv-sub{font-size:12px;color:var(--text-muted);margin-top:3px;}
+  .pv-item .pv-status{margin:0;}
+  .pv-new{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:14px 16px;border:1px dashed var(--border);border-radius:14px;margin-bottom:12px;background:var(--surface-1);}
+  .pv-new .field{flex:1;min-width:200px;margin:0;}
+  .pv-none{padding:28px 16px;text-align:center;color:var(--text-muted);font-size:14px;border:1px dashed var(--border);border-radius:14px;}
+  .pv-headline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0;}
   .pv-exit{display:none;position:absolute;top:10px;right:14px;z-index:3;}
   .pv-frame-wrap.is-full .pv-exit{display:inline-flex;}
 
@@ -913,7 +923,7 @@
     <button class="tab" data-view="all">All Tasks</button>
     <button class="tab" data-view="projects">Projects</button>
     <button class="tab" data-view="competitions">Competitions</button>
-    <button class="tab" data-view="private" id="tab-private" style="display:none;">Private page</button>
+    <button class="tab" data-view="private" id="tab-private" style="display:none;">Private pages</button>
   </div>
 
   <!-- OVERVIEW -->
@@ -1171,45 +1181,62 @@
     <div class="comp-grid" id="comp-grid"></div>
   </section>
 
-  <!-- PRIVATE PAGE (admin only) — a standalone HTML page that lives in the database; people who sign in
-       with its own password see ONLY that page. Shown here in a sandboxed frame. -->
+  <!-- PRIVATE PAGES (admin only) — standalone HTML pages that live in a private storage bucket, each with its
+       own name, file and password; people who sign in with a page's password see ONLY that page.
+       Two screens in one tab: the list of pages, and one page's own panel (shown in a sandboxed frame). -->
   <section class="view" id="view-private">
-    <div class="section-head">
-      <h2 id="pv-title">Private page</h2>
-      <span style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn" id="pv-settings-toggle">⚙ Page settings</button>
-        <button class="btn" id="pv-full">⛶ Full screen</button>
-      </span>
+    <div id="pv-list-view">
+      <div class="section-head">
+        <h2>Private pages</h2>
+        <button class="btn btn-primary" id="pv-new">+ New page</button>
+      </div>
+      <div class="muted" id="pv-setup-warning" style="display:none;margin-bottom:12px;color:var(--stc-coral,#ff375e);font-weight:600;">The database table for the pages does not exist yet — run <code>add-private-pages.sql</code> in Supabase first.</div>
+      <div class="pv-hint">Every page has its own HTML file, name and password. People who type a page’s password on the sign-in screen see only that page — never the tracker. Click a page to preview it, replace its file, rename it, change its password or delete it.</div>
+      <div class="pv-new" id="pv-new-row" style="display:none;">
+        <div class="field"><label>Name of the new page</label><input type="text" id="pv-new-name" maxlength="60" placeholder="e.g. Sales playbook"></div>
+        <button class="btn btn-primary" id="pv-new-create">Create</button>
+        <button class="btn" id="pv-new-cancel">Cancel</button>
+      </div>
+      <div class="pv-list" id="pv-list"></div>
     </div>
-    <div class="pv-status" id="pv-status"></div>
-    <div class="pv-settings" id="pv-settings" style="display:none;">
-      <div class="muted" id="pv-setup-warning" style="display:none;margin-bottom:12px;color:var(--stc-coral,#ff375e);font-weight:600;">The database table for this page does not exist yet — run <code>add-private-page.sql</code> in Supabase first.</div>
-      <h4>1 · The file</h4>
-      <div class="pv-row">
-        <div class="field"><label>HTML file</label><input type="file" id="pv-file" accept=".html,.htm,text/html"></div>
-        <button class="btn btn-primary" id="pv-upload" style="margin-bottom:6px;">Upload file</button>
+
+    <div id="pv-detail-view" style="display:none;">
+      <div class="section-head">
+        <span class="pv-headline"><button class="btn" id="pv-back">← All pages</button><h2 id="pv-title">Private page</h2></span>
+        <span style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn" id="pv-settings-toggle">⚙ Page settings</button>
+          <button class="btn" id="pv-full">⛶ Full screen</button>
+        </span>
       </div>
-      <div class="pv-hint" id="pv-file-note">Choose a self-contained .html file (images and styles embedded, or loaded from the internet), up to 50 MB. Replacing the file changes <b>only</b> the page’s content — the name and the password stay exactly as they are. The current page stays live until the new file has fully uploaded; people who already have it open see the new version the next time they open or reload it. Large files can take a minute or two.</div>
-      <hr class="pv-divider">
-      <h4>2 · The name</h4>
-      <div class="pv-row">
-        <div class="field"><label>Name (also the tab name)</label><input type="text" id="pv-title-input" maxlength="60" placeholder="Private page"></div>
-        <button class="btn" id="pv-save-title" style="margin-bottom:6px;">Save name</button>
+      <div class="pv-status" id="pv-status"></div>
+      <div class="pv-settings" id="pv-settings" style="display:none;">
+        <h4>1 · The file</h4>
+        <div class="pv-row">
+          <div class="field"><label>HTML file</label><input type="file" id="pv-file" accept=".html,.htm,text/html"></div>
+          <button class="btn btn-primary" id="pv-upload" style="margin-bottom:6px;">Upload file</button>
+        </div>
+        <div class="pv-hint" id="pv-file-note">Choose a self-contained .html file (images and styles embedded, or loaded from the internet), up to 50 MB. Replacing the file changes <b>only</b> this page’s content — its name and password stay exactly as they are. The current page stays live until the new file has fully uploaded; people who already have it open see the new version the next time they open or reload it. Large files can take a minute or two.</div>
+        <hr class="pv-divider">
+        <h4>2 · The name</h4>
+        <div class="pv-row">
+          <div class="field"><label>Name of this page</label><input type="text" id="pv-title-input" maxlength="60" placeholder="Private page"></div>
+          <button class="btn" id="pv-save-title" style="margin-bottom:6px;">Save name</button>
+        </div>
+        <hr class="pv-divider">
+        <h4>3 · The password</h4>
+        <div class="pv-row">
+          <div class="field"><label>New password for this page</label><input type="password" id="pv-password" autocomplete="new-password" placeholder="At least 6 characters"></div>
+          <button class="btn btn-primary" id="pv-set-password" style="margin-bottom:6px;">Set password</button>
+        </div>
+        <div class="pv-hint">Share it only with the people who should see this page. They open the same site address and type it on the usual sign-in screen — they will see <b>only</b> this page, never the tracker. The password is stored scrambled, so it can’t be shown again; to change it, just set a new one. It has to be different from the admin passphrase, every employee passcode and every other page’s password.</div>
+        <hr class="pv-divider">
+        <button class="btn btn-danger" id="pv-remove">Delete this page</button>
       </div>
-      <hr class="pv-divider">
-      <h4>3 · The password</h4>
-      <div class="pv-row">
-        <div class="field"><label>New password for this page</label><input type="password" id="pv-password" autocomplete="new-password" placeholder="At least 6 characters"></div>
-        <button class="btn btn-primary" id="pv-set-password" style="margin-bottom:6px;">Set password</button>
+      <div class="pv-frame-wrap" id="pv-frame-wrap">
+        <button class="btn pv-exit" id="pv-exit">✕ Exit full screen</button>
+        <iframe id="pv-frame" title="Private page preview" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals" style="display:none;"></iframe>
+        <div class="pv-empty" id="pv-empty">Loading…</div>
       </div>
-      <div class="pv-hint">Share it only with the people who should see this page. They open the same site address and type it on the usual sign-in screen — they will see <b>only</b> this page, never the tracker. The password is stored scrambled, so it can’t be shown again; to change it, just set a new one. It has to be different from the admin passphrase and every employee passcode.</div>
-      <hr class="pv-divider">
-      <button class="btn btn-danger" id="pv-remove">Remove page and password</button>
-    </div>
-    <div class="pv-frame-wrap" id="pv-frame-wrap">
-      <button class="btn pv-exit" id="pv-exit">✕ Exit full screen</button>
-      <iframe id="pv-frame" title="Private page preview" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals" style="display:none;"></iframe>
-      <div class="pv-empty" id="pv-empty">Loading…</div>
     </div>
   </section>
 
@@ -1728,7 +1755,7 @@
         projects: json.projects || [], sprints: json.sprints || [], steps: json.steps || [],
         competitions: json.competitions || [],
         competitionRecipients: json.competitionRecipients || [],
-        privatePage: json.privatePage || null,
+        privatePages: json.privatePages || null, privatePagesSetup: json.privatePagesSetup !== false,
         cachedAt: Date.now()
       }));
     }catch(e){ /* storage full/unavailable — fine, this is just a best-effort cache */ }
@@ -1970,7 +1997,8 @@
     var hid = hiddenNameSet_();
     state.competitions = (json.competitions || []).filter(function(c){ return c.received || !hid[normName(c.ownerName)]; });
     state.compRecipients = json.competitionRecipients || [];
-    state.privatePage = json.privatePage || null;
+    state.privatePages = Array.isArray(json.privatePages) ? json.privatePages.map(metaFrom_) : null;
+    state.privatePagesSetup = json.privatePagesSetup !== false;
   }
 
   function fetchTasks(){
@@ -2035,10 +2063,9 @@
   function updateRoleUI(){
     var pill = document.getElementById('role-pill');
     var lockBtn = document.getElementById('btn-lock');
-    // The private-page tab is admin-only (and only once the backend reported it).
-    var pvTab = document.getElementById('tab-private'), showPv = !SAMPLE && state.role === 'admin' && !!state.privatePage;
+    // The private-pages tab is admin-only (and only once the backend reported it).
+    var pvTab = document.getElementById('tab-private'), showPv = !SAMPLE && state.role === 'admin' && Array.isArray(state.privatePages);
     pvTab.style.display = showPv ? '' : 'none';
-    if(showPv) pvTab.textContent = state.privatePage.title || 'Private page';
     if(!showPv && state.view === 'private') switchView('overview');
     if(!CONFIG.API_URL || !state.role){
       pill.style.display = 'none';
@@ -2067,7 +2094,7 @@
     try{ localStorage.removeItem(keyStorageName()); }catch(e){}
     try{ localStorage.removeItem(dataCacheStorageName()); }catch(e){}
     state.tasks = []; state.students = []; state.projects = []; state.sprints = []; state.steps = []; state.competitions = []; state.compRecipients = [];
-    state.privatePage = null; resetPrivateAdmin_();
+    state.privatePages = null; state.privatePagesSetup = true; resetPrivateAdmin_();
     leavePageMode_();
     updateRoleUI();
     renderAll();
@@ -5142,11 +5169,12 @@
   }
 
 
-  /* ---------- Private page ----------
-     One standalone HTML page (up to 50 MB), stored in a private Supabase Storage bucket and only made
-     available to someone who knows its password.
-     - Anyone who signs in with that password sees ONLY the page (enterPageMode_): no tabs, no tracker data.
-     - The admin gets a tab with the same page plus settings (upload the HTML, set the password).
+  /* ---------- Private pages ----------
+     Any number of standalone HTML pages (each up to 50 MB), each with its own name and password, stored in a
+     private Supabase Storage bucket and only made available to someone who knows that page's password.
+     - Anyone who signs in with a page's password sees ONLY that page (enterPageMode_): no tabs, no tracker data.
+     - The admin gets one tab: a list of the pages, and for each page its own panel (preview, replace the file,
+       rename, set the password, delete). Nothing done to one page can touch another.
      The file never goes through the tracker function: the admin's browser uploads it straight to Storage
      (a one-time signed link from the function) and everyone else's browser downloads it straight from
      Storage (a 10-minute signed link from the function, given only after the password is checked).
@@ -5157,10 +5185,10 @@
   var pvLoaded = false, pvPickedFile = null, pvSettingsAutoOpened = false, pvLoadSeq = 0, poLoadSeq = 0;
   var ORIGINAL_TITLE = document.title;
 
-  function fmtMB_(bytes){ return (bytes / 1000000).toFixed(bytes >= 10000000 ? 0 : 1) + ' MB'; }
+  function fmtMB_(bytes){ return bytes < 1000000 ? Math.max(1, Math.round(bytes / 1000)) + ' KB' : (bytes / 1000000).toFixed(bytes >= 10000000 ? 0 : 1) + ' MB'; }
   function metaFrom_(res){
-    return { setup: res.setup !== false, title: res.title || 'Private page', hasHtml: !!res.hasHtml, hasPassword: !!res.hasPassword,
-      sizeBytes: Number(res.sizeBytes) || 0, updatedAt: res.updatedAt || '' };
+    return { id: res.id || '', title: res.title || 'Private page', hasHtml: !!res.hasHtml, hasPassword: !!res.hasPassword,
+      sizeBytes: Number(res.sizeBytes) || 0, createdAt: res.createdAt || '', updatedAt: res.updatedAt || '' };
   }
   /** Stops showing whatever a frame had (and frees the memory of a downloaded page). */
   function releaseFrame_(frame){
@@ -5246,51 +5274,133 @@
   }
   document.getElementById('po-lock').addEventListener('click', function(){ lockOut(''); });
 
-  /* ----- admin tab ----- */
+  /* ----- admin: the list, and one page's own panel ----- */
+  var PV_FILE_NOTE_HTML = document.getElementById('pv-file-note').innerHTML;
+  var pvBusy = 0;                     // uploads in progress (you can't leave the page's panel meanwhile)
+  state.pvOpenId = null;
   function pvChip_(ok, yes, no){ return '<span class="pv-chip '+(ok ? 'ok' : 'bad')+'">'+esc(ok ? yes : no)+'</span>'; }
+  function pvPage_(id){ var l = state.privatePages || []; for(var i = 0; i < l.length; i++) if(l[i].id === id) return l[i]; return null; }
+  function pvCur_(){ return state.pvOpenId ? pvPage_(state.pvOpenId) : null; }
+  function pvPut_(meta){
+    var l = state.privatePages || (state.privatePages = []);
+    for(var i = 0; i < l.length; i++) if(l[i].id === meta.id){ l[i] = meta; return; }
+    l.push(meta);
+  }
+  function pvWhen_(iso){
+    if(!iso) return ''; var d = new Date(iso); if(isNaN(d.getTime())) return '';
+    return d.toLocaleDateString(undefined, {day:'numeric', month:'short', year:'numeric'});
+  }
+  function pvChips_(m, short){
+    return pvChip_(m.hasHtml, 'Page uploaded' + (m.sizeBytes ? ' (' + fmtMB_(m.sizeBytes) + ')' : ''), 'No file yet') +
+      pvChip_(m.hasPassword, 'Password set', short ? 'No password' : 'No password — nobody can open it yet') +
+      (m.hasHtml && m.hasPassword ? '<span class="pv-chip ok">' + (short ? 'Live' : 'Live — people with the password see only this page') + '</span>' : '');
+  }
+  /** Leaves the open page (frees the preview's memory). Does not redraw. */
+  function pvResetOpen_(){
+    state.pvOpenId = null; pvLoaded = false; pvPickedFile = null; pvLoadSeq++;
+    setPvFull_(false);
+    releaseFrame_(document.getElementById('pv-frame'));
+  }
   function renderPrivateTab_(){
-    var m = state.privatePage; if(!m || !document.getElementById('view-private')) return;
-    document.getElementById('pv-title').textContent = m.title || 'Private page';
-    var ti = document.getElementById('pv-title-input'); if(document.activeElement !== ti) ti.value = m.title || '';
-    document.getElementById('pv-status').innerHTML =
-      pvChip_(m.hasHtml, 'Page uploaded' + (m.sizeBytes ? ' (' + fmtMB_(m.sizeBytes) + ')' : ''), 'No page uploaded yet') +
-      pvChip_(m.hasPassword, 'Password set', 'No password set — nobody can open it yet') +
-      (m.hasHtml && m.hasPassword ? '<span class="pv-chip ok">Live — people with the password see only this page</span>' : '');
-    document.getElementById('pv-upload').textContent = m.hasHtml ? 'Replace file' : 'Upload file';
-    document.getElementById('pv-setup-warning').style.display = m.setup ? 'none' : '';
-    if(!pvSettingsAutoOpened && (!m.setup || !m.hasHtml || !m.hasPassword)){
+    if(!document.getElementById('view-private') || !Array.isArray(state.privatePages)) return;
+    var cur = pvCur_();
+    if(state.pvOpenId && !cur){ pvResetOpen_(); }            // the open page no longer exists
+    document.getElementById('pv-list-view').style.display = cur ? 'none' : '';
+    document.getElementById('pv-detail-view').style.display = cur ? '' : 'none';
+    document.getElementById('pv-setup-warning').style.display = state.privatePagesSetup === false ? '' : 'none';
+    if(!cur){
+      var list = state.privatePages, box = document.getElementById('pv-list');
+      box.innerHTML = list.length ? list.map(function(m){
+        var sub = pvWhen_(m.updatedAt) ? 'Updated ' + pvWhen_(m.updatedAt) : '';
+        return '<button type="button" class="pv-item" data-pv-open="'+esc(m.id)+'"><div style="min-width:0;"><div class="pv-name">'+esc(m.title)+'</div>' +
+          (sub ? '<div class="pv-sub">'+esc(sub)+'</div>' : '') + '</div><div class="pv-status">' + pvChips_(m, true) + '</div></button>';
+      }).join('') : '<div class="pv-none">' + (state.privatePagesSetup === false ? 'Set up the database first (see the note above).' : 'No pages yet — press “+ New page” to add the first one.') + '</div>';
+      return;
+    }
+    document.getElementById('pv-title').textContent = cur.title || 'Private page';
+    var ti = document.getElementById('pv-title-input'); if(document.activeElement !== ti) ti.value = cur.title || '';
+    document.getElementById('pv-status').innerHTML = pvChips_(cur);
+    document.getElementById('pv-upload').textContent = cur.hasHtml ? 'Replace file' : 'Upload file';
+    if(!pvSettingsAutoOpened && (!cur.hasHtml || !cur.hasPassword)){
       pvSettingsAutoOpened = true; document.getElementById('pv-settings').style.display = '';
     }
   }
+  function openPrivatePage_(id){
+    if(!pvPage_(id)) return;
+    pvResetOpen_();
+    state.pvOpenId = id; pvSettingsAutoOpened = false;
+    document.getElementById('pv-file').value = '';
+    document.getElementById('pv-file-note').innerHTML = PV_FILE_NOTE_HTML;
+    document.getElementById('pv-password').value = '';
+    document.getElementById('pv-settings').style.display = 'none';
+    var empty = document.getElementById('pv-empty'); empty.style.display = ''; empty.textContent = 'Loading…';
+    renderPrivateTab_(); loadPrivatePage_(true);
+    window.scrollTo(0, 0);
+  }
+  function closePrivatePage_(){
+    if(pvBusy){ showToast('An upload is still running — wait for it to finish.'); return; }
+    pvResetOpen_(); renderPrivateTab_();
+  }
+  function resetPrivateAdmin_(){
+    pvBusy = 0; pvResetOpen_();
+    document.getElementById('pv-new-row').style.display = 'none';
+  }
   function loadPrivatePage_(force){
-    if(!state.privatePage || SAMPLE) return;
+    var id = state.pvOpenId; if(!id || SAMPLE) return;
     if(pvLoaded && !force) return;
     var frame = document.getElementById('pv-frame'), empty = document.getElementById('pv-empty'), seq = ++pvLoadSeq;
-    apiCall('getPrivatePage', {}).then(function(res){
+    apiCall('getPrivatePage', { id: id }).then(function(res){
+      if(seq !== pvLoadSeq) return null;                      // moved on to another page / left meanwhile
       if(!res || res.ok === false){ throw new Error(errText_(res)); }
-      state.privatePage = metaFrom_(res); renderPrivateTab_(); updateRoleUI();
+      pvPut_(metaFrom_(res)); renderPrivateTab_();
       return resolvePageContent_(res, empty);
     }).then(function(content){
       if(seq !== pvLoadSeq) return;
       pvLoaded = true;
-      setFrameContent_(frame, empty, content, 'No page uploaded yet — open “Page settings” and choose an HTML file.');
+      setFrameContent_(frame, empty, content, 'No file uploaded yet — open “Page settings” and choose an HTML file.');
     }).catch(function(err){
       if(seq !== pvLoadSeq) return;
       releaseFrame_(frame); frame.style.display = 'none'; empty.style.display = '';
       empty.textContent = 'Could not load the page. ' + (err && err.message ? err.message : '');
     });
   }
-  document.getElementById('tab-private').addEventListener('click', function(){ renderPrivateTab_(); loadPrivatePage_(false); });
+  document.getElementById('tab-private').addEventListener('click', function(){ renderPrivateTab_(); if(state.pvOpenId && !pvLoaded) loadPrivatePage_(false); });
+  document.getElementById('pv-list').addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('[data-pv-open]') : null;
+    if(b) openPrivatePage_(b.getAttribute('data-pv-open'));
+  });
+  document.getElementById('pv-back').addEventListener('click', closePrivatePage_);
+  /* new page */
+  function pvNewToggle_(on){
+    var row = document.getElementById('pv-new-row'), inp = document.getElementById('pv-new-name');
+    row.style.display = on ? '' : 'none'; if(on){ inp.value = ''; inp.focus(); }
+  }
+  document.getElementById('pv-new').addEventListener('click', function(){ pvNewToggle_(document.getElementById('pv-new-row').style.display === 'none'); });
+  document.getElementById('pv-new-cancel').addEventListener('click', function(){ pvNewToggle_(false); });
+  function pvCreate_(){
+    var btn = document.getElementById('pv-new-create'), title = document.getElementById('pv-new-name').value.trim();
+    if(!title){ showToast('Enter a name for the new page.'); return; }
+    btn.disabled = true;
+    apiCall('createPrivatePage', { data: { title: title } }).then(function(res){
+      btn.disabled = false;
+      if(!res || res.ok === false){ showToast('Page not created. ' + errText_(res)); return; }
+      var m = metaFrom_(res); pvPut_(m); pvNewToggle_(false); renderPrivateTab_();
+      showToast('Page created — now upload its file and set a password.');
+      openPrivatePage_(m.id);
+    }).catch(function(){ btn.disabled = false; showToast('Page not created — could not reach the server.'); });
+  }
+  document.getElementById('pv-new-create').addEventListener('click', pvCreate_);
+  document.getElementById('pv-new-name').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); pvCreate_(); } });
   document.getElementById('pv-settings-toggle').addEventListener('click', function(){
     var el = document.getElementById('pv-settings'); el.style.display = el.style.display === 'none' ? '' : 'none';
   });
   document.getElementById('pv-file').addEventListener('change', function(e){
-    var f = e.target.files && e.target.files[0], note = document.getElementById('pv-file-note');
+    var f = e.target.files && e.target.files[0], note = document.getElementById('pv-file-note'), cur = pvCur_();
     pvPickedFile = null; if(!f) return;
     if(f.size > MAX_PAGE_BYTES){ note.textContent = 'That file is ' + fmtMB_(f.size) + ' — the limit is 50 MB. Shrink embedded images or video and try again.'; e.target.value = ''; return; }
     if(f.size === 0){ note.textContent = 'That file is empty.'; e.target.value = ''; return; }
     pvPickedFile = f;
-    note.textContent = 'Selected: ' + f.name + ' (' + fmtMB_(f.size) + ') — press “' + (state.privatePage && state.privatePage.hasHtml ? 'Replace file' : 'Upload file') + '” to publish it.';
+    note.textContent = 'Selected: ' + f.name + ' (' + fmtMB_(f.size) + ') — press “' + (cur && cur.hasHtml ? 'Replace file' : 'Upload file') + '” to publish it.';
   });
   /** Sends the file straight to Storage with the one-time signed link (same request Supabase's own library makes),
    *  reporting progress. Only the public "apikey" header is sent — the one-time token in the URL is the authorisation. */
@@ -5314,10 +5424,10 @@
     });
   }
   /** Upload straight to Storage: ask the function for a one-time link, send the file, tell the function it arrived. */
-  function uploadPrivatePage_(file, title, note){
+  function uploadPrivatePage_(id, file, title, note){
     var prep;
     note.textContent = 'Preparing the upload…';
-    return apiCall('preparePrivatePageUpload', {}).then(function(res){
+    return apiCall('preparePrivatePageUpload', { id: id }).then(function(res){
       if(!res || res.ok === false) throw new Error(errText_(res));
       prep = res;
       return putToStorage_(prep, file, function(done, total){
@@ -5325,59 +5435,66 @@
       });
     }).then(function(){
       note.textContent = 'Finishing…';
-      return apiCall('finishPrivatePageUpload', { path: prep.path, title: title });
+      return apiCall('finishPrivatePageUpload', { id: id, path: prep.path, title: title });
     }).then(function(res){
       if(!res || res.ok === false) throw new Error(errText_(res));
       return res;
     });
   }
-  /** Replace (or first-time upload of) the file. Sends ONLY the file: the name and password are never touched. */
+  /** Replace (or first-time upload of) THIS page's file. Sends ONLY the file: the name and password are never touched. */
   document.getElementById('pv-upload').addEventListener('click', function(){
-    var btn = this, note = document.getElementById('pv-file-note');
+    var btn = this, note = document.getElementById('pv-file-note'), id = state.pvOpenId, cur = pvCur_();
+    if(!id || !cur) return;
     if(!pvPickedFile){ showToast('Choose an HTML file first.'); return; }
-    var file = pvPickedFile; btn.disabled = true;
-    uploadPrivatePage_(file, undefined, note).then(function(res){
-      btn.disabled = false;
-      state.privatePage = metaFrom_(res);
+    var file = pvPickedFile, had = cur.hasHtml; btn.disabled = true; pvBusy++;
+    uploadPrivatePage_(id, file, undefined, note).then(function(res){
+      btn.disabled = false; pvBusy--;
+      pvPut_(metaFrom_(res));
+      if(state.pvOpenId !== id) return;
       pvPickedFile = null; document.getElementById('pv-file').value = '';
-      note.textContent = 'Done — the file was replaced (' + fmtMB_(res.sizeBytes || file.size) + '). The name and password were not changed.';
-      renderPrivateTab_(); updateRoleUI(); showToast('File replaced.');
+      note.textContent = 'Done — the file was ' + (had ? 'replaced' : 'uploaded') + ' (' + fmtMB_(res.sizeBytes || file.size) + '). The name and password were not changed.';
+      renderPrivateTab_(); showToast(had ? 'File replaced.' : 'File uploaded.');
       loadPrivatePage_(true);
     }).catch(function(err){
-      btn.disabled = false;
-      note.textContent = 'Not uploaded — the page that was live is unchanged. ' + (err && err.message ? err.message : 'Something went wrong.');
+      btn.disabled = false; pvBusy--;
+      if(state.pvOpenId !== id) return;
+      note.textContent = 'Not uploaded — ' + (had ? 'the page that was live is unchanged. ' : 'nothing was saved. ') + (err && err.message ? err.message : 'Something went wrong.');
       showToast('Not uploaded. ' + (err && err.message ? err.message : ''));
     });
   });
   document.getElementById('pv-save-title').addEventListener('click', function(){
-    var btn = this, title = document.getElementById('pv-title-input').value.trim();
+    var btn = this, id = state.pvOpenId, title = document.getElementById('pv-title-input').value.trim();
+    if(!id) return;
     if(!title){ showToast('Enter a name for the page.'); return; }
     btn.disabled = true;
-    apiCall('savePrivatePage', { data: { title: title } }).then(function(res){
+    apiCall('savePrivatePage', { id: id, data: { title: title } }).then(function(res){
       btn.disabled = false;
       if(!res || res.ok === false){ showToast('Name not saved. ' + errText_(res)); return; }
-      state.privatePage = metaFrom_(res); renderPrivateTab_(); updateRoleUI(); showToast('Name saved.');
+      pvPut_(metaFrom_(res)); renderPrivateTab_(); showToast('Name saved.');
     }).catch(function(){ btn.disabled = false; showToast('Name not saved — could not reach the server.'); });
   });
   document.getElementById('pv-set-password').addEventListener('click', function(){
-    var btn = this, inp = document.getElementById('pv-password'), pw = inp.value.trim();
+    var btn = this, id = state.pvOpenId, inp = document.getElementById('pv-password'), pw = inp.value.trim();
+    if(!id) return;
     if(pw.length < 6){ showToast('Use at least 6 characters for the password.'); return; }
     btn.disabled = true;
-    apiCall('setPrivatePagePassword', {password:pw}).then(function(res){
+    apiCall('setPrivatePagePassword', { id: id, password: pw }).then(function(res){
       btn.disabled = false;
       if(!res || res.ok === false){ showToast('Password not changed. ' + errText_(res)); return; }
-      inp.value = ''; state.privatePage = metaFrom_(res); renderPrivateTab_();
+      inp.value = ''; pvPut_(metaFrom_(res)); renderPrivateTab_();
       showToast('Password saved — share it with the people who should see this page.');
     }).catch(function(){ btn.disabled = false; showToast('Password not changed — could not reach the server.'); });
   });
   document.getElementById('pv-remove').addEventListener('click', function(){
-    if(!confirm('Remove the private page and its password?\n\nThe page content is deleted and nobody can open it any more until you upload a page and set a password again.')) return;
-    apiCall('deletePrivatePage', {}).then(function(res){
-      if(!res || res.ok === false){ showToast('Not removed. ' + errText_(res)); return; }
-      state.privatePage = metaFrom_(res); pvLoadSeq++; pvLoaded = true;
-      setFrameContent_(document.getElementById('pv-frame'), document.getElementById('pv-empty'), null, 'No page uploaded yet — open “Page settings” and choose an HTML file.');
-      renderPrivateTab_(); updateRoleUI(); showToast('Removed.');
-    }).catch(function(){ showToast('Not removed — could not reach the server.'); });
+    var id = state.pvOpenId, cur = pvCur_(); if(!id || !cur) return;
+    if(pvBusy){ showToast('An upload is still running — wait for it to finish.'); return; }
+    if(!confirm('Delete the page “' + cur.title + '”?\n\nIts file and its password are deleted for good and nobody can open it any more. Your other pages are not affected.')) return;
+    apiCall('deletePrivatePage', { id: id }).then(function(res){
+      if(!res || res.ok === false){ showToast('Not deleted. ' + errText_(res)); return; }
+      state.privatePages = (state.privatePages || []).filter(function(m){ return m.id !== id; });
+      if(state.pvOpenId === id) pvResetOpen_();
+      renderPrivateTab_(); showToast('Page deleted.');
+    }).catch(function(){ showToast('Not deleted — could not reach the server.'); });
   });
   function setPvFull_(on){
     document.getElementById('pv-frame-wrap').classList.toggle('is-full', !!on);
