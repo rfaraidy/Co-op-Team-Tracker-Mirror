@@ -406,6 +406,12 @@
   .comp-commission .amt.is-none{color:var(--text-muted);font-weight:500;}
   .comp-card-foot{padding:12px 20px;border-top:1px solid var(--gridline);background:color-mix(in srgb, var(--series-1) 4%, var(--surface-1));
     display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--text-secondary);}
+  .comp-eligible{margin-top:2px;}
+  .comp-eligible .row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:13px;color:var(--text-secondary);}
+  .comp-eligible .row b{font-size:15.5px;color:var(--text-primary);font-variant-numeric:tabular-nums;}
+  .comp-eligible .row .pct{font-weight:700;color:color-mix(in srgb, var(--comp-color) 70%, var(--text-primary));font-variant-numeric:tabular-nums;}
+  .comp-bar{height:6px;border-radius:99px;background:color-mix(in srgb, var(--comp-color) 16%, var(--surface-1));overflow:hidden;margin-top:7px;}
+  .comp-bar i{display:block;height:100%;background:var(--comp-color);border-radius:99px;}
   .comp-empty{padding:38px 12px;text-align:center;color:var(--text-muted);font-size:13.5px;border:1px dashed var(--border);border-radius:var(--radius);}
 
   /* The coral "Announced" button (stc coral) */
@@ -1470,9 +1476,21 @@
       <div class="field" style="flex:1;min-width:150px;"><label>Month *</label><select id="cf-month"></select></div>
       <div class="field" style="flex:2;min-width:200px;display:none;" id="cf-owner-field"><label>Employee</label><select id="cf-owner"></select></div>
     </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <div class="field" style="flex:1;min-width:150px;"><label>Start date *</label><input type="date" id="cf-start"></div>
+      <div class="field" style="flex:1;min-width:150px;"><label>End date *</label><input type="date" id="cf-end"></div>
+    </div>
+    <div class="muted" id="cf-duration-note" style="font-size:12px;margin:-4px 0 12px;">The competition’s duration — pick when it starts and when it ends.</div>
     <div id="cf-create-only">
       <div class="field"><label>State *</label><div class="comp-state-pick" id="cf-state-pick"></div></div>
       <div class="field" id="cf-amount-field" style="display:none;"><label>Amount (SAR) *</label><input type="text" inputmode="decimal" id="cf-amount" placeholder="e.g. 85000"></div>
+      <div id="cf-people-field" style="display:none;">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <div class="field" style="flex:1;min-width:150px;"><label>Number of participants *</label><input type="text" inputmode="numeric" id="cf-participants" placeholder="e.g. 120"></div>
+          <div class="field" style="flex:1;min-width:150px;"><label>Number of eligible *</label><input type="text" inputmode="numeric" id="cf-eligible" placeholder="e.g. 90"></div>
+        </div>
+        <div class="muted" id="cf-people-note" style="font-size:12px;margin:-4px 0 12px;"></div>
+      </div>
       <div class="field" id="cf-to-field" style="display:none;"><label>Send to *</label><select id="cf-to"></select>
         <div class="muted" style="font-size:11.5px;margin-top:4px;">They will only receive the Comp ID, name, month, amount and the poster.</div></div>
       <div class="field"><label>Description <span class="muted" style="font-weight:400;">(becomes the first step of the timeline)</span></label><textarea id="cf-description" placeholder="What is this competition about, what is happening now…"></textarea></div>
@@ -5508,7 +5526,9 @@
      Each employee keeps their own competitions (the server only sends a member their own; admin
      gets everyone's). A competition has a TIMELINE of steps — each step is a state + a description
      with its date/time. The competition's state / last description / amount always mirror the
-     latest step. "Announce" sends a limited copy (ID, name, month, amount, poster) to a colleague,
+     latest step (a Validated step also carries the number of participants and how many are eligible; the card
+     shows the eligible count and % and the amount). Each competition has a duration (start and end date).
+     "Announce" sends a limited copy (ID, name, month, amount, poster) to a colleague,
      who presses the coral "Announced" button, which closes it.
      The poster image is not in the normal data load — it is fetched when you open a competition. */
   var COMP_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -5547,6 +5567,47 @@
     var n = Number(t);
     return (isFinite(n) && n >= 0) ? n : null;
   }
+  /** Whole number of people typed by a person ("1,200" ok); null when it isn't one. */
+  function parseCountInput_(raw){
+    var t = String(raw == null ? '' : raw).replace(/[,\s]/g, '');
+    if(!/^\d+$/.test(t)) return null;
+    var n = Number(t); return n <= 100000000 ? n : null;
+  }
+  /** Eligible ÷ participants as a percentage with at most one decimal (75, 66.7); null when it can't be worked out. */
+  function eligiblePct_(p, e){
+    if(p === null || p === undefined || e === null || e === undefined || !(Number(p) > 0)) return null;
+    var v = Math.round(Number(e) / Number(p) * 1000) / 10;
+    return v;
+  }
+  function fmtPct_(v){ return v === null ? '—' : (Math.round(v) === v ? String(v) : v.toFixed(1)) + '%'; }
+  function fmtInt_(n){ return Number(n).toLocaleString('en-US'); }
+  /** "90 of 120 · 75%" — shared by the forms' live hint and the detail view. */
+  function peopleSummary_(p, e){
+    if(p === null || p === undefined || e === null || e === undefined) return '';
+    var pc = eligiblePct_(p, e);
+    return fmtInt_(e) + ' eligible of ' + fmtInt_(p) + (pc === null ? '' : ' · ' + fmtPct_(pc));
+  }
+  function dayFromIso_(iso){
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || '')); if(!m) return null;
+    return new Date(+m[1], +m[2]-1, +m[3]);
+  }
+  /** Inclusive number of days between two ISO dates (5 Oct → 20 Oct = 16), or null. */
+  function durationDays_(a, b){
+    var d1 = dayFromIso_(a), d2 = dayFromIso_(b); if(!d1 || !d2) return null;
+    return Math.round((Date.UTC(d2.getFullYear(), d2.getMonth(), d2.getDate()) - Date.UTC(d1.getFullYear(), d1.getMonth(), d1.getDate())) / 86400000) + 1;
+  }
+  /** "5 Oct → 20 Oct" (years are added when they differ from this year or from each other). */
+  function durationRange_(a, b){
+    var d1 = dayFromIso_(a), d2 = dayFromIso_(b); if(!d1 || !d2) return '';
+    var now = new Date().getFullYear(), showY = d1.getFullYear() !== d2.getFullYear() || d1.getFullYear() !== now;
+    function f(d){ return d.getDate() + ' ' + COMP_MONTHS[d.getMonth()] + (showY ? ' ' + d.getFullYear() : ''); }
+    return f(d1) + ' → ' + f(d2);
+  }
+  function durationText_(c){
+    var r = durationRange_(c.startDate, c.endDate); if(!r) return '';
+    var n = durationDays_(c.startDate, c.endDate);
+    return r + (n ? ' · ' + n + ' day' + (n === 1 ? '' : 's') : '');
+  }
   function compStepDate_(iso){
     var d = new Date(iso); if(isNaN(d.getTime())) return { day:'—', time:'' };
     var y = d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : '';
@@ -5558,14 +5619,18 @@
     var steps = c.steps || [], last = steps.length ? steps[steps.length-1] : null;
     c.state = last ? last.state : 'Calculating';
     c.description = last ? (last.description || '') : '';
-    var amt = null, to = '';
+    var amt = null, to = '', part = null, elig = null;
     for(var i = steps.length - 1; i >= 0; i--){
       if(amt === null && steps[i].amount !== undefined && steps[i].amount !== null) amt = Number(steps[i].amount);
+      if(part === null && steps[i].participants !== undefined && steps[i].participants !== null){
+        part = Number(steps[i].participants);
+        elig = (steps[i].eligible === undefined || steps[i].eligible === null) ? null : Number(steps[i].eligible);
+      }
       if(!to && steps[i].state === 'Announce' && steps[i].to) to = steps[i].to;
     }
-    c.amount = amt; c.announcedTo = to;
+    c.amount = amt; c.announcedTo = to; c.participants = part; c.eligible = elig;
   }
-  function compSnapshot_(c){ return { steps:(c.steps||[]).slice(), state:c.state, description:c.description, amount:c.amount, announcedTo:c.announcedTo }; }
+  function compSnapshot_(c){ return { steps:(c.steps||[]).slice(), state:c.state, description:c.description, amount:c.amount, participants:c.participants, eligible:c.eligible, announcedTo:c.announcedTo }; }
   function compMe_(){ return isAdmin() ? 'Admin' : (state.myName || ''); }
 
   state.compFilter = { state:'', month:'', owner:'', q:'' };
@@ -5605,6 +5670,14 @@
     return '<div class="comp-commission"><span class="lbl">Competition Commission</span>'+
       (a ? '<span class="amt">'+esc(a)+'<small>SAR</small></span>' : '<span class="amt is-none">—</span>')+'</div>';
   }
+  /** "Eligible 90 · 75%" with a thin bar — only for competitions that have been validated with the numbers. */
+  function compEligibleHtml_(c){
+    if(c.participants === null || c.participants === undefined || c.eligible === null || c.eligible === undefined) return '';
+    var pc = eligiblePct_(c.participants, c.eligible);
+    return '<div class="comp-eligible"><div class="row"><span>Eligible <b>'+esc(fmtInt_(c.eligible))+'</b> <span class="muted">of '+esc(fmtInt_(c.participants))+'</span></span>'+
+      '<span class="pct">'+esc(fmtPct_(pc))+'</span></div>'+
+      '<div class="comp-bar" role="img" aria-label="'+esc(fmtPct_(pc))+' eligible"><i style="width:'+Math.max(0, Math.min(100, pc === null ? 0 : pc))+'%"></i></div></div>';
+  }
   function compCardHtml_(c){
     var st = compStateInfo_(c.state), monthFull = COMP_MONTH_FULL[COMP_MONTHS.indexOf(c.month)] || c.month || '—';
     var head = '<div class="comp-card-top"><span class="comp-ico">'+compIcon_('spark')+'</span><span class="comp-pill">'+esc(c.state)+'</span></div>'+
@@ -5622,6 +5695,8 @@
         '<div class="comp-last'+(c.description ? '' : ' is-empty')+'">'+(c.description ? esc(c.description) : 'No description yet')+'</div>'+
         '<div class="comp-line comp-person">'+compIcon_('person')+'<span>'+esc(c.ownerName || 'Unassigned')+'</span></div>'+
         '<div class="comp-line">'+compIcon_('cal')+'<span>'+esc(monthFull)+'</span></div>'+
+        (durationText_(c) ? '<div class="comp-line">'+compIcon_('clock')+'<span>'+esc(durationText_(c))+'</span></div>' : '')+
+        compEligibleHtml_(c)+
         compCommissionHtml_(c);
     }
     return '<div class="comp-card" role="button" tabindex="0" data-comp-open="'+esc(c.id)+'" style="'+compColorStyle_(c.state)+'">'+
@@ -5733,6 +5808,10 @@
     return '<div class="tl">' + steps.map(function(s, i){
       var info = compStateInfo_(s.state), dt = compStepDate_(s.at), meta = [];
       if(s.state === 'Validated' && s.amount !== undefined && s.amount !== null) meta.push('<span>Amount <b>'+esc(fmtAmount_(s.amount))+' SAR</b></span>');
+      if(s.state === 'Validated' && s.participants !== undefined && s.participants !== null){
+        meta.push('<span>Participants <b>'+esc(fmtInt_(s.participants))+'</b></span>');
+        if(s.eligible !== undefined && s.eligible !== null) meta.push('<span>Eligible <b>'+esc(fmtInt_(s.eligible))+(eligiblePct_(s.participants, s.eligible) !== null ? ' ('+esc(fmtPct_(eligiblePct_(s.participants, s.eligible)))+')' : '')+'</b></span>');
+      }
       if(s.state === 'Announce' && s.to) meta.push('<span>Sent to <b>'+esc(s.to)+'</b></span>');
       if(s.by) meta.push('<span>by <b>'+esc(s.by)+'</b></span>');
       if(canDelete && steps.length > 1) meta.push('<button type="button" class="tl-del" data-step-del="'+esc(s.id)+'">Delete</button>');
@@ -5751,6 +5830,9 @@
     var monthFull = COMP_MONTH_FULL[COMP_MONTHS.indexOf(c.month)] || c.month || '—';
     var facts = '<div class="comp-facts">'+
       '<div class="comp-fact"><div class="k">Month</div><div class="v">'+esc(monthFull)+'</div></div>'+
+      (!c.received && durationText_(c) ? '<div class="comp-fact"><div class="k">Duration</div><div class="v">'+esc(durationText_(c))+'</div></div>' : '')+
+      (!c.received && c.participants !== null && c.participants !== undefined ? '<div class="comp-fact"><div class="k">Participants</div><div class="v">'+esc(fmtInt_(c.participants))+'</div></div>' : '')+
+      (!c.received && c.eligible !== null && c.eligible !== undefined ? '<div class="comp-fact accent"><div class="k">Eligible</div><div class="v">'+esc(fmtInt_(c.eligible))+(eligiblePct_(c.participants, c.eligible) !== null ? ' · '+esc(fmtPct_(eligiblePct_(c.participants, c.eligible))) : '')+'</div></div>' : '')+
       (!c.received && isAdmin() ? '<div class="comp-fact"><div class="k">Employee</div><div class="v">'+esc(c.ownerName||'Unassigned')+'</div></div>' : '')+
       '<div class="comp-fact accent"><div class="k">Competition commission</div><div class="v">'+(a ? esc(a)+' SAR' : '—')+'</div></div>'+
       (!c.received && c.announcedTo ? '<div class="comp-fact"><div class="k">Announce sent to</div><div class="v">'+esc(c.announcedTo)+'</div></div>' : '')+
@@ -5769,6 +5851,10 @@
         html += '<div class="comp-section-title">Add update</div><div class="comp-upd" id="comp-upd">'+
           '<div class="field"><label>State</label><div class="comp-state-pick" id="cu-state-pick"></div></div>'+
           '<div class="field" id="cu-amount-field" style="display:none;"><label>Amount (SAR) *</label><input type="text" inputmode="decimal" id="cu-amount" placeholder="e.g. 85000"></div>'+
+          '<div id="cu-people-field" style="display:none;"><div style="display:flex;gap:12px;flex-wrap:wrap;">'+
+            '<div class="field" style="flex:1;min-width:150px;"><label>Number of participants *</label><input type="text" inputmode="numeric" id="cu-participants" placeholder="e.g. 120"></div>'+
+            '<div class="field" style="flex:1;min-width:150px;"><label>Number of eligible *</label><input type="text" inputmode="numeric" id="cu-eligible" placeholder="e.g. 90"></div></div>'+
+            '<div class="hint" id="cu-people-note" style="margin:-4px 0 10px;"></div></div>'+
           '<div class="field" id="cu-to-field" style="display:none;"><label>Send to *</label><select id="cu-to"></select>'+
             '<div class="hint">They will only receive the Comp ID, name, month, amount and the poster.</div></div>'+
           '<div class="field"><label>Description</label><textarea id="cu-desc" placeholder="What happened? This is added to the timeline with today’s date."></textarea></div>'+
@@ -5806,12 +5892,39 @@
     var pick = document.getElementById('cu-state-pick');
     function sync(name){
       document.getElementById('cu-amount-field').style.display = name === 'Validated' ? '' : 'none';
+      document.getElementById('cu-people-field').style.display = name === 'Validated' ? '' : 'none';
       document.getElementById('cu-to-field').style.display = name === 'Announce' ? '' : 'none';
-      if(name === 'Validated'){ var amt = document.getElementById('cu-amount'); if(!amt.value && c.amount !== null && c.amount !== undefined) amt.value = c.amount; }
+      if(name === 'Validated'){
+        var amt = document.getElementById('cu-amount'); if(!amt.value && c.amount !== null && c.amount !== undefined) amt.value = c.amount;
+        var pp = document.getElementById('cu-participants'), ee = document.getElementById('cu-eligible');
+        if(!pp.value && c.participants !== null && c.participants !== undefined) pp.value = c.participants;
+        if(!ee.value && c.eligible !== null && c.eligible !== undefined) ee.value = c.eligible;
+        peopleNote_('cu-participants', 'cu-eligible', 'cu-people-note');
+      }
       if(name === 'Announce') fillRecipientSelect_(document.getElementById('cu-to'), c.ownerName);
     }
     renderStatePick_(pick, c.state, sync); sync(c.state);
+    ['cu-participants', 'cu-eligible'].forEach(function(id){ document.getElementById(id).addEventListener('input', function(){ peopleNote_('cu-participants', 'cu-eligible', 'cu-people-note'); }); });
     document.getElementById('cu-add').addEventListener('click', function(){ submitCompUpdate_(c); });
+  }
+  /** Live hint under the two number boxes: "90 eligible of 120 · 75%" (or what is wrong). */
+  function peopleNote_(pId, eId, noteId){
+    var note = document.getElementById(noteId); if(!note) return;
+    var pr = document.getElementById(pId).value.trim(), er = document.getElementById(eId).value.trim();
+    var p = parseCountInput_(pr), e = parseCountInput_(er);
+    if(!pr && !er){ note.textContent = ''; note.style.color = ''; return; }
+    if((pr && p === null) || (er && e === null)){ note.textContent = 'Use whole numbers only.'; note.style.color = 'var(--stc-coral)'; return; }
+    if(p !== null && e !== null && e > p){ note.textContent = 'Eligible can’t be more than the participants.'; note.style.color = 'var(--stc-coral)'; return; }
+    note.style.color = '';
+    note.textContent = (p !== null && e !== null) ? peopleSummary_(p, e) : '';
+  }
+  /** Reads + checks the two number boxes. Returns {participants, eligible} or null (after showing why). */
+  function readPeople_(pId, eId){
+    var p = parseCountInput_(document.getElementById(pId).value), e = parseCountInput_(document.getElementById(eId).value);
+    if(p === null){ showToast('Enter the number of participants (a whole number).'); return null; }
+    if(e === null){ showToast('Enter the number of eligible people (a whole number).'); return null; }
+    if(e > p){ showToast('Eligible people can’t be more than the participants.'); return null; }
+    return { participants:p, eligible:e };
   }
   function submitCompUpdate_(c){
     var pick = document.getElementById('cu-state-pick'), stateName = pickedState_(pick);
@@ -5823,6 +5936,8 @@
       var amt = parseAmountInput_(document.getElementById('cu-amount').value);
       if(amt === null){ showToast('Enter the amount (a number) for a Validated competition.'); return; }
       data.amount = amt;
+      var ppl = readPeople_('cu-participants', 'cu-eligible'); if(!ppl) return;
+      data.participants = ppl.participants; data.eligible = ppl.eligible;
     }
     if(stateName === 'Announce'){
       var to = document.getElementById('cu-to').value;
@@ -5832,6 +5947,7 @@
     if(String(c.id).indexOf('temp-') === 0){ showToast('Still saving this competition — try again in a second.'); return; }
     step = { id: genTempId(), at: new Date().toISOString(), state: stateName, description: desc, by: compMe_() };
     if(data.amount !== undefined) step.amount = data.amount;
+    if(data.participants !== undefined){ step.participants = data.participants; step.eligible = data.eligible; }
     if(data.announcedTo) step.to = data.announcedTo;
     var snap = compSnapshot_(c);
     c.steps = (c.steps || []).concat([step]); applyDerived_(c);
@@ -5906,9 +6022,22 @@
     document.getElementById('cf-poster-remove').style.display = compForm.poster ? '' : 'none';
     document.getElementById('cf-poster-pick').textContent = compForm.poster ? 'Replace image' : 'Upload image';
   }
+  /** Live line under the two date boxes: "16 days" or what is wrong. */
+  function durationNote_(){
+    var a = document.getElementById('cf-start').value, b = document.getElementById('cf-end').value, note = document.getElementById('cf-duration-note');
+    var base = 'The competition’s duration — pick when it starts and when it ends.';
+    note.style.color = '';
+    if(!a || !b){ note.textContent = base; return; }
+    var n = durationDays_(a, b);
+    if(n === null || n < 1){ note.textContent = 'The end date can’t be before the start date.'; note.style.color = 'var(--stc-coral)'; return; }
+    note.textContent = 'Duration: ' + durationRange_(a, b) + ' · ' + n + ' day' + (n === 1 ? '' : 's');
+  }
+  ['cf-start', 'cf-end'].forEach(function(id){ document.getElementById(id).addEventListener('change', durationNote_); document.getElementById(id).addEventListener('input', durationNote_); });
+  ['cf-participants', 'cf-eligible'].forEach(function(id){ document.getElementById(id).addEventListener('input', function(){ peopleNote_('cf-participants', 'cf-eligible', 'cf-people-note'); }); });
   function cfOwnerName_(){ return isAdmin() ? document.getElementById('cf-owner').value : state.myName; }
   function syncCreateFields_(name){
     document.getElementById('cf-amount-field').style.display = name === 'Validated' ? '' : 'none';
+    document.getElementById('cf-people-field').style.display = name === 'Validated' ? '' : 'none';
     document.getElementById('cf-to-field').style.display = name === 'Announce' ? '' : 'none';
     if(name === 'Announce') fillRecipientSelect_(document.getElementById('cf-to'), cfOwnerName_());
   }
@@ -5920,6 +6049,10 @@
     document.getElementById('cf-name').value = c ? c.name : '';
     document.getElementById('cf-description').value = '';
     document.getElementById('cf-amount').value = '';
+    document.getElementById('cf-participants').value = ''; document.getElementById('cf-eligible').value = ''; peopleNote_('cf-participants', 'cf-eligible', 'cf-people-note');
+    document.getElementById('cf-start').value = c && c.startDate ? c.startDate : '';
+    document.getElementById('cf-end').value = c && c.endDate ? c.endDate : '';
+    durationNote_();
     var monthSel = document.getElementById('cf-month');
     monthSel.innerHTML = COMP_MONTHS.map(function(m){ return '<option>'+m+'</option>'; }).join('');
     monthSel.value = c && c.month ? c.month : COMP_MONTHS[new Date().getMonth()];
@@ -6003,9 +6136,17 @@
     if(!compId){ showToast('Comp ID is required.'); return; }
     if(!name){ showToast('Competition name is required.'); return; }
     if(!month){ showToast('Pick a month.'); return; }
+    var startDate = document.getElementById('cf-start').value, endDate = document.getElementById('cf-end').value;
+    var legacyNoDates = isEdit && !startDate && !endDate;              // older competitions made before durations existed can be edited without
+    if(!legacyNoDates){
+      if(!startDate || !endDate){ showToast('Pick the start date and the end date of the competition.'); return; }
+      var nd = durationDays_(startDate, endDate);
+      if(nd === null || nd < 1){ showToast('The end date can’t be before the start date.'); return; }
+    }
     var dup = state.competitions.find(function(x){ return !x.received && normName(x.compId) === normName(compId) && x.id !== compForm.id; });
     if(dup){ showToast('Comp ID "'+compId+'" is already used by “'+(dup.name||'another competition')+'”.'); return; }
     var data = { compId:compId, name:name, month:month };
+    if(!legacyNoDates){ data.startDate = startDate; data.endDate = endDate; }
     if(isAdmin()) data.ownerName = document.getElementById('cf-owner').value;
     if(!isEdit || compForm.posterChanged) data.announcement = compForm.poster || '';
     var step = null;
@@ -6018,6 +6159,8 @@
         var amt = parseAmountInput_(document.getElementById('cf-amount').value);
         if(amt === null){ showToast('Enter the amount (a number) for a Validated competition.'); return; }
         data.amount = amt; step.amount = amt;
+        var ppl = readPeople_('cf-participants', 'cf-eligible'); if(!ppl) return;
+        data.participants = ppl.participants; data.eligible = ppl.eligible; step.participants = ppl.participants; step.eligible = ppl.eligible;
       }
       if(stateName === 'Announce'){
         var to = document.getElementById('cf-to').value;
@@ -6029,6 +6172,7 @@
 
     function localFields(base){
       var o = Object.assign({}, base, { compId:compId, name:name, month:month, hasAnnouncement: !!hasPoster, updatedAt:new Date().toISOString() });
+      if(!legacyNoDates){ o.startDate = startDate; o.endDate = endDate; }
       o.ownerName = isAdmin() ? (data.ownerName || '') : (state.myName || '');
       return o;
     }
